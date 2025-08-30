@@ -8,7 +8,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}
 html,body{height:100%;width:100%;}
-.container{display:flex;height:100%;width:100%;overflow:hidden;position:relative;}
+.container{display:flex;height:100%;width:100%;overflow:hidden;}
 .sidebar{width:280px;background:#4f46e5;color:white;display:flex;flex-direction:column;padding:20px;}
 .sidebar h2{margin-bottom:15px;font-size:1.3rem;}
 .group-list{flex:1;overflow-y:auto;margin-bottom:15px;}
@@ -17,9 +17,8 @@ html,body{height:100%;width:100%;}
 .join-group{display:flex;flex-direction:column;gap:8px;}
 .join-group input{padding:10px;border:none;border-radius:8px;}
 .join-group button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;font-weight:600;}
-.main{flex:1;display:flex;flex-direction:column;height:100%;position:relative;}
-.chat-header{padding:15px;background:#6366f1;color:white;font-size:1.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.2);position:relative;}
-.participants-btn{position:absolute;top:15px;right:15px;background:#4f46e5;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;}
+.main{flex:1;display:flex;flex-direction:column;height:100%;}
+.chat-header{padding:15px;background:#6366f1;color:white;font-size:1.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
 .chat-area{flex:1;padding:15px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#f9fafc;}
 .message{padding:12px 18px;border-radius:24px;max-width:70%;word-break:break-word;position:relative;animation:fadeIn 0.3s;box-shadow:0 3px 10px rgba(0,0,0,0.1);}
 .incoming{background:#e0e7ff;align-self:flex-start;}
@@ -30,9 +29,6 @@ html,body{height:100%;width:100%;}
 .message-input input[type=text]{flex:1;padding:10px;border-radius:12px;border:1px solid #ddd;}
 .message-input input[type=file]{display:none;}
 .btn-file{padding:10px;border-radius:8px;background:#6b7280;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.participants-panel{position:absolute;top:0;right:-250px;width:250px;height:100%;background:#f3f4f6;box-shadow:-4px 0 15px rgba(0,0,0,0.2);transition:right 0.3s;padding:15px;overflow-y:auto;z-index:10;}
-.participants-panel.active{right:0;}
-.participant-item{padding:8px 10px;border-radius:8px;margin-bottom:5px;background:white;box-shadow:0 2px 5px rgba(0,0,0,0.1);font-weight:500;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -50,12 +46,8 @@ html,body{height:100%;width:100%;}
     </div>
   </div>
   <div class="main">
-    <div class="chat-header" id="chatHeader">
-      Select or Join a Group
-      <button class="participants-btn" onclick="toggleParticipantsPanel()"><i class="fas fa-users"></i></button>
-    </div>
+    <div class="chat-header" id="chatHeader">Select or Join a Group</div>
     <div class="chat-area" id="chatArea"></div>
-    <div class="participants-panel" id="participantsPanel"></div>
     <div class="message-input">
       <input type="text" id="messageText" placeholder="Type message..." onkeypress="if(event.key==='Enter') sendMessage()">
       <label class="btn-file">
@@ -113,14 +105,12 @@ async function joinGroup(){
   const pwd=document.getElementById('groupPasswordInput').value;
   if(!gid||!pwd)return alert('Enter Group ID and Password');
   activeGroupId=gid;
-  localStorage.setItem('lastGroupId',gid);
   encryptionKey=await deriveKey(pwd,gid);
   db.ref(`groups/${gid}/users/${userId}`).set({username,lastSeen:Date.now()});
   updateGroupActivity();
   document.getElementById('chatHeader').textContent='Group: '+gid;
   addGroupToList(gid);
   listenMessages();
-  listenParticipants();
 }
 
 // Sidebar
@@ -128,7 +118,7 @@ function addGroupToList(gid){
   const list=document.getElementById('groupList');
   if([...list.children].some(c=>c.textContent===gid))return;
   const div=document.createElement('div');div.className='group-item active';div.textContent=gid;
-  div.onclick=()=>{activeGroupId=gid;document.getElementById('chatHeader').textContent='Group: '+gid; listenMessages(); listenParticipants();}
+  div.onclick=()=>{activeGroupId=gid;document.getElementById('chatHeader').textContent='Group: '+gid; listenMessages();}
   list.appendChild(div);
 }
 
@@ -173,42 +163,6 @@ function listenMessages(){
     chatArea.appendChild(div);chatArea.scrollTop=chatArea.scrollHeight;
   });
 }
-
-// Toggle participants panel
-function toggleParticipantsPanel(){
-  document.getElementById('participantsPanel').classList.toggle('active');
-}
-
-// Listen participants
-function listenParticipants(){
-  if(!activeGroupId)return;
-  db.ref(`groups/${activeGroupId}/users`).on('value', snapshot => {
-    const users = snapshot.val() || {};
-    const panel = document.getElementById('participantsPanel');
-    panel.innerHTML = '';
-    Object.values(users).forEach(u => {
-      const div = document.createElement('div');
-      div.className = 'participant-item';
-      div.textContent = u.username;
-      panel.appendChild(div);
-    });
-  });
-}
-
-  // Restore last group after refresh
-window.addEventListener('load', async () => {
-  const lastGroup = localStorage.getItem('lastGroupId');
-  if (lastGroup) {
-    const pwd = prompt(`Enter password for group ${lastGroup}`);
-    if (pwd) {
-      activeGroupId = lastGroup;
-      encryptionKey = await deriveKey(pwd, activeGroupId);
-      document.getElementById('chatHeader').textContent = 'Group: ' + activeGroupId;
-      addGroupToList(activeGroupId);
-      listenMessages();
-      listenParticipants();
-    } else {
-      localStorage.removeItem('lastGroupId'); // clear if no password entered
-    }
-  }
-});
+</script>
+</body>
+</html>
