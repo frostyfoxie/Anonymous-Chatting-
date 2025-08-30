@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anonymous Encrypted Chat</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body { font-family:sans-serif; background:#f0f2f5; margin:0; padding:20px; display:flex; flex-direction:column; align-items:center;}
+.container { width:100%; max-width:600px; background:white; padding:20px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.1);}
+h1 { text-align:center; color:#4a6cf7;}
+#chat-box { height:300px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:15px; border-radius:8px; background:#fafafa;}
+textarea, input { width:100%; padding:10px; margin-bottom:10px; border-radius:6px; border:1px solid #ccc; resize:none;}
+.btn { background:#4a6cf7; color:white; padding:10px 15px; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><i class="fas fa-comments"></i> Anonymous Chat</h1>
+
+  <input type="password" id="password" placeholder="Enter encryption key">
+  <div id="chat-box"></div>
+  <textarea id="plaintext" rows="3" placeholder="Type your message..."></textarea>
+  <button class="btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// ===== Firebase config =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
+  authDomain: "anonymous-chatting-c6712.firebaseapp.com",
+  databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "anonymous-chatting-c6712",
+  storageBucket: "anonymous-chatting-c6712.firebasestorage.app",
+  messagingSenderId: "124331866043",
+  appId: "1:124331866043:web:8be37be9d84974b4a0b69e",
+  measurementId: "G-WVDHPRB41K"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ===== AES encryption helpers =====
+async function encryptMessageToReturnValue(message, password){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password),
+    {name:"PBKDF2"}, false, ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    {name:"PBKDF2", salt:salt, iterations:100000, hash:"SHA-256"},
+    keyMaterial, {name:"AES-GCM", length:256}, false, ["encrypt"]
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({name:"AES-GCM", iv:iv}, key, new TextEncoder().encode(message));
+  const combined = new Uint8Array([...salt, ...iv, ...new Uint8Array(encrypted)]);
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptMessageFromValue(encryptedText, password){
+  const dataStr = atob(encryptedText);
+  const data = new Uint8Array(dataStr.length);
+  for(let i=0;i<dataStr.length;i++) data[i]=dataStr.charCodeAt(i);
+  const salt = data.slice(0,16), iv=data.slice(16,28), encryptedData=data.slice(28);
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password),
+    {name:"PBKDF2"}, false, ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    {name:"PBKDF2", salt:salt, iterations:100000, hash:"SHA-256"},
+    keyMaterial, {name:"AES-GCM", length:256}, false, ["decrypt"]
+  );
+  const decrypted = await crypto.subtle.decrypt({name:"AES-GCM", iv:iv}, key, encryptedData);
+  return new TextDecoder().decode(decrypted);
+}
+
+// ===== Send message =====
+async function sendMessage(){
+  const plaintext = document.getElementById('plaintext').value;
+  const password = document.getElementById('password').value;
+  if(!plaintext || !password){ alert("Enter message and key!"); return; }
+  const encrypted = await encryptMessageToReturnValue(plaintext, password);
+  db.ref('messages/' + Date.now()).set({ text: encrypted });
+  document.getElementById('plaintext').value='';
+}
+
+// ===== Receive messages =====
+db.ref('messages').on('child_added', async snapshot=>{
+  const encrypted = snapshot.val().text;
+  const password = document.getElementById('password').value;
+  if(!password) return;
+  try{
+    const decrypted = await decryptMessageFromValue(encrypted, password);
+    const chatBox = document.getElementById('chat-box');
+    const div = document.createElement('div');
+    div.innerHTML = `<strong>Anonymous:</strong> ${decrypted}`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }catch(e){ console.log("Failed to decrypt"); }
+});
+</script>
+</body>
+  </html>
