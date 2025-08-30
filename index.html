@@ -8,32 +8,34 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}
 html,body{height:100%;width:100%;}
-.container{display:flex;height:100%;width:100%;overflow:hidden;position:relative;}
-.sidebar{width:280px;background:#4f46e5;color:white;display:flex;flex-direction:column;padding:20px;flex-shrink:0;}
-.sidebar h2{margin-bottom:15px;font-size:1.3rem;}
-.group-list{flex:1;overflow-y:auto;margin-bottom:15px;}
-.group-item{background: rgba(255,255,255,0.1); border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;transition:0.3s;}
-.group-item:hover,.group-item.active{background: rgba(255,255,255,0.25);box-shadow:0 4px 15px rgba(0,0,0,0.2);}
+.container{display:flex;height:100%;width:100%;overflow:hidden;}
+.sidebar{width:280px;background:#4f46e5;color:white;display:flex;flex-direction:column;padding:20px;}
+.sidebar h2{margin-bottom:10px;font-size:1.3rem;}
+.sidebar .section-title{margin:10px 0 5px;font-weight:600;}
+.group-list,.dm-list{flex:1;overflow-y:auto;margin-bottom:10px;}
+.group-item,.dm-item{background: rgba(255,255,255,0.1); border-radius:12px;padding:10px;margin-bottom:6px;cursor:pointer;transition:0.3s;}
+.group-item:hover,.group-item.active,.dm-item:hover,.dm-item.active{background: rgba(255,255,255,0.25);box-shadow:0 4px 12px rgba(0,0,0,0.2);}
 .join-group{display:flex;flex-direction:column;gap:8px;}
-.join-group input{padding:10px;border:none;border-radius:8px;}
-.join-group button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;font-weight:600;}
-.main{flex:1;display:flex;flex-direction:column;height:100%;position:relative;}
-.chat-header{padding:15px;background:#6366f1;color:white;font-size:1.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.2);display:flex;justify-content:space-between;align-items:center;}
-.chat-area{flex:1;padding:15px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#f9fafc;}
-.message{padding:12px 18px;border-radius:24px;max-width:70%;word-break:break-word;position:relative;animation:fadeIn 0.3s;box-shadow:0 3px 10px rgba(0,0,0,0.1);}
+.join-group input{padding:8px;border:none;border-radius:8px;}
+.join-group button{padding:8px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;font-weight:600;}
+.main{flex:1;display:flex;flex-direction:column;height:100%;}
+.chat-header{padding:12px;background:#6366f1;color:white;font-size:1.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.2);display:flex;justify-content:space-between;align-items:center;position:relative;}
+.chat-area{flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#f9fafc;}
+.message{padding:10px 14px;border-radius:24px;max-width:70%;word-break:break-word;position:relative;animation:fadeIn 0.3s;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
 .incoming{background:#e0e7ff;align-self:flex-start;}
-.outgoing{background:#4f46e5;color:white;align-self:flex-end;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
-.message-sender{font-weight:600;font-size:0.85rem;margin-bottom:4px;}
-.message-img{max-width:200px;border-radius:16px;margin-top:5px;box-shadow:0 2px 10px rgba(0,0,0,0.15);}
-.message-input{display:flex;padding:15px;gap:10px;border-top:1px solid #ddd;background:white;}
-.message-input input[type=text]{flex:1;padding:10px;border-radius:12px;border:1px solid #ddd;}
+.outgoing{background:#4f46e5;color:white;align-self:flex-end;box-shadow:0 3px 10px rgba(0,0,0,0.15);}
+.message-sender{font-weight:600;font-size:0.8rem;margin-bottom:3px;display:flex;align-items:center;gap:5px;}
+.message-img{max-width:180px;border-radius:12px;margin-top:4px;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
+.message-input{display:flex;padding:12px;gap:8px;border-top:1px solid #ddd;background:white;}
+.message-input input[type=text]{flex:1;padding:8px;border-radius:10px;border:1px solid #ddd;}
 .message-input input[type=file]{display:none;}
-.btn-file{padding:10px;border-radius:8px;background:#6b7280;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.participants-panel{width:200px;background:#f3f4f6;position:absolute;top:0;right:-200px;height:100%;box-shadow:-3px 0 10px rgba(0,0,0,0.15);transition:0.3s;padding:15px;overflow-y:auto;z-index:10;}
-.participants-panel.show{right:0;}
-.participants-panel h3{margin-bottom:10px;}
-.participant{padding:8px 10px;border-radius:8px;background:#e5e7eb;margin-bottom:6px;}
-@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.btn-file{padding:8px;border-radius:8px;background:#6b7280;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.participants-list{position:absolute;top:100%;right:10px;background:white;color:black;padding:10px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.2);display:none;min-width:160px;z-index:100;}
+.participants-list .participant{padding:5px 8px;border-radius:6px;margin-bottom:4px;background:#f3f4f6;font-size:0.85rem;}
+.participants-list .participant:last-child{margin-bottom:0;}
+.username-display{font-weight:600;font-size:0.85rem;display:flex;align-items:center;gap:5px;}
+.username-display img{width:20px;height:20px;border-radius:50%;object-fit:cover;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:translateY(0);}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -43,6 +45,10 @@ html,body{height:100%;width:100%;}
   <div class="sidebar">
     <h2><i class="fas fa-users"></i> Groups</h2>
     <div class="group-list" id="groupList"></div>
+    <div class="sidebar">
+      <div class="section-title">DMs</div>
+      <div class="dm-list" id="dmList"></div>
+    </div>
     <div class="join-group">
       <input type="text" id="groupIdInput" placeholder="Group ID">
       <input type="password" id="groupPasswordInput" placeholder="Group Password">
@@ -50,9 +56,10 @@ html,body{height:100%;width:100%;}
     </div>
   </div>
   <div class="main">
-    <div class="chat-header">
-      <span id="chatHeader">Select or Join a Group</span>
-      <button onclick="toggleParticipants()" style="background:#4f46e5;color:white;padding:5px 10px;border-radius:8px;cursor:pointer;"><i class="fas fa-users"></i></button>
+    <div class="chat-header" id="chatHeader">
+      <span id="chatTitle">Select or Join a Group</span>
+      <button onclick="toggleParticipants()" style="background:none;border:none;color:white;cursor:pointer;"><i class="fas fa-user-friends"></i></button>
+      <div class="participants-list" id="participantsList"></div>
     </div>
     <div class="chat-area" id="chatArea"></div>
     <div class="message-input">
@@ -63,10 +70,6 @@ html,body{height:100%;width:100%;}
       </label>
       <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
     </div>
-  </div>
-  <div class="participants-panel" id="participantsPanel">
-    <h3>Participants</h3>
-    <div id="participantsList"></div>
   </div>
 </div>
 
@@ -84,29 +87,30 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Username
-const adjectives = ['Mysterious','Anonymous','Secret','Hidden','Stealthy','Private','Unknown','Incognito','Covert','Discreet'];
-const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
-function generateUsername(){return adjectives[Math.floor(Math.random()*adjectives.length)]+nouns[Math.floor(Math.random()*nouns.length)]+Math.floor(Math.random()*1000);}
-
-// Persistent username & userId
+// Persistent username & PFP
 let username = localStorage.getItem('username');
-if(!username){username=generateUsername();localStorage.setItem('username',username);}
-let userId = localStorage.getItem('userId');
-if(!userId){userId=(Math.random().toString(36).substring(2)+Date.now().toString(36));localStorage.setItem('userId',userId);}
+let userPfp = localStorage.getItem('userPfp');
+if(!username){ 
+  const adjectives = ['Mysterious','Anonymous','Secret','Hidden','Stealthy','Private','Unknown','Incognito','Covert','Discreet'];
+  const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
+  username = adjectives[Math.floor(Math.random()*adjectives.length)]+nouns[Math.floor(Math.random()*nouns.length)]+Math.floor(Math.random()*1000);
+  localStorage.setItem('username',username);
+}
 
-// Persistent groups
-let joinedGroups = JSON.parse(localStorage.getItem('joinedGroups') || '[]');
-
+// State
+let userId = localStorage.getItem('userId') || (Math.random().toString(36).substring(2)+Date.now().toString(36));
+localStorage.setItem('userId',userId);
 let activeGroupId=null;
 let encryptionKey=null;
+let activeDmId=null;
 
-// AES-GCM key
+// Encryption helpers
 async function deriveKey(password,saltStr){
   const salt=new TextEncoder().encode(saltStr);
   const keyMaterial=await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
+
 async function encryptData(data){const iv=crypto.getRandomValues(new Uint8Array(12));const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},encryptionKey,data);return {iv:Array.from(iv),data:btoa(String.fromCharCode(...new Uint8Array(encrypted)))};}
 async function decryptData(obj){return await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(obj.iv)},encryptionKey,Uint8Array.from(atob(obj.data),c=>c.charCodeAt(0)));}
 
@@ -118,97 +122,82 @@ async function joinGroup(){
   const gid=document.getElementById('groupIdInput').value.trim();
   const pwd=document.getElementById('groupPasswordInput').value;
   if(!gid||!pwd)return alert('Enter Group ID and Password');
-  activeGroupId=gid;
+  activeGroupId=gid; activeDmId=null;
   encryptionKey=await deriveKey(pwd,gid);
-  db.ref(`groups/${gid}/users/${userId}`).set({username,lastSeen:Date.now()});
+  db.ref(`groups/${gid}/users/${userId}`).set({username,userPfp,lastSeen:Date.now()});
   updateGroupActivity();
-  document.getElementById('chatHeader').textContent='Group: '+gid;
-  if(!joinedGroups.includes(gid)){joinedGroups.push(gid); localStorage.setItem('joinedGroups',JSON.stringify(joinedGroups));}
-  renderGroupList();
+  document.getElementById('chatTitle').textContent='Group: '+gid;
+  addGroupToList(gid);
   listenMessages();
   listenParticipants();
 }
 
-// Render groups from localStorage
-function renderGroupList(){
-  const list=document.getElementById('groupList'); list.innerHTML='';
-  joinedGroups.forEach(gid=>{
-    const div=document.createElement('div'); div.className='group-item';
-    if(activeGroupId===gid) div.classList.add('active');
-    div.textContent=gid;
-    div.onclick=()=>{activeGroupId=gid;document.getElementById('chatHeader').textContent='Group: '+gid; listenMessages(); listenParticipants(); renderGroupList();}
-    list.appendChild(div);
-  });
+// Sidebar
+function addGroupToList(gid){
+  const list=document.getElementById('groupList');
+  if([...list.children].some(c=>c.textContent===gid))return;
+  const div=document.createElement('div'); div.className='group-item active'; div.textContent=gid;
+  div.onclick=()=>{activeGroupId=gid;activeDmId=null; document.getElementById('chatTitle').textContent='Group: '+gid; listenMessages(); listenParticipants();}
+  list.appendChild(div);
 }
-renderGroupList();
 
 // Send text
 async function sendMessage(){
-  if(!activeGroupId)return;
-  const text=document.getElementById('messageText').value.trim();if(!text)return;
+  if(!activeGroupId && !activeDmId)return;
+  const text=document.getElementById('messageText').value.trim(); if(!text)return;
   const encryptedObj=await encryptData(new TextEncoder().encode(text));
-  const msgRef=db.ref(`groups/${activeGroupId}/messages`).push();
-  msgRef.set({userId,username,encryptedText:encryptedObj,timestamp:Date.now()});
-  setTimeout(()=>msgRef.remove(),24*60*60*1000);
+  let ref;
+  if(activeGroupId) ref=db.ref(`groups/${activeGroupId}/messages`).push();
+  else if(activeDmId) ref=db.ref(`dms/${[userId,activeDmId].sort().join('_')}`).push();
+  ref.set({userId,username,userPfp,encryptedText:encryptedObj,timestamp:Date.now()});
+  setTimeout(()=>ref.remove(),24*60*60*1000);
   document.getElementById('messageText').value='';
-  updateGroupActivity();
+  if(activeGroupId) updateGroupActivity();
 }
 
 // Send image
 async function sendImage(event){
-  if(!activeGroupId)return;
-  const file=event.target.files[0];if(!file)return;
+  if(!activeGroupId && !activeDmId)return;
+  const file=event.target.files[0]; if(!file)return;
   const arrayBuffer=await file.arrayBuffer();
   const encryptedObj=await encryptData(arrayBuffer);
-  const msgRef=db.ref(`groups/${activeGroupId}/messages`).push();
-  msgRef.set({userId,username,encryptedImage:encryptedObj,timestamp:Date.now()});
-  setTimeout(()=>msgRef.remove(),60*1000);
+  let ref;
+  if(activeGroupId) ref=db.ref(`groups/${activeGroupId}/messages`).push();
+  else if(activeDmId) ref=db.ref(`dms/${[userId,activeDmId].sort().join('_')}`).push();
+  ref.set({userId,username,userPfp,encryptedImage:encryptedObj,timestamp:Date.now()});
+  setTimeout(()=>ref.remove(),60*1000);
   event.target.value='';
-  updateGroupActivity();
+  if(activeGroupId) updateGroupActivity();
 }
 
 // Listen messages
 function listenMessages(){
-  if(!activeGroupId)return;
-  const chatArea=document.getElementById('chatArea');chatArea.innerHTML='';
-  const ref=db.ref(`groups/${activeGroupId}/messages`);
+  const chatArea=document.getElementById('chatArea'); chatArea.innerHTML='';
+  let ref;
+  if(activeGroupId) ref=db.ref(`groups/${activeGroupId}/messages`);
+  else if(activeDmId) ref=db.ref(`dms/${[userId,activeDmId].sort().join('_')}`);
+  if(!ref) return;
   ref.off();
   ref.on('child_added',async snap=>{
-    const msg=snap.val(); 
+    const msg=snap.val();
     const div=document.createElement('div'); div.classList.add('message',msg.userId===userId?'outgoing':'incoming');
     try{
-      if(msg.encryptedText){const decrypted=new TextDecoder().decode(await decryptData(msg.encryptedText));div.innerHTML=`<div class="message-sender">${msg.username}</div>${decrypted}`;}
-      else if(msg.encryptedImage){const decrypted=new Blob([await decryptData(msg.encryptedImage)]);const url=URL.createObjectURL(decrypted);div.innerHTML=`<div class="message-sender">${msg.username}</div><img src="${url}" class="message-img">`;}
+      if(msg.encryptedText){const decrypted=new TextDecoder().decode(await decryptData(msg.encryptedText)); div.innerHTML=`<div class="message-sender">${msg.userPfp?`<img src="${msg.userPfp}">`:""}${msg.username}</div>${decrypted}`;}
+      else if(msg.encryptedImage){const decrypted=new Blob([await decryptData(msg.encryptedImage)]); const url=URL.createObjectURL(decrypted); div.innerHTML=`<div class="message-sender">${msg.userPfp?`<img src="${msg.userPfp}">`:""}${msg.username}</div><img src="${url}" class="message-img">`;}
     }catch{div.innerHTML=`<div class="message-sender">${msg.username}</div>[Cannot decrypt]`;}
-    chatArea.appendChild(div);chatArea.scrollTop=chatArea.scrollHeight;
+    chatArea.appendChild(div); chatArea.scrollTop=chatArea.scrollHeight;
   });
 }
 
 // Participants
-function toggleParticipants(){document.getElementById('participantsPanel').classList.toggle('show');}
+function toggleParticipants(){ const pl=document.getElementById('participantsList'); pl.style.display=(pl.style.display==='none')?'block':'none';}
+document.addEventListener('click',e=>{if(!e.target.closest('.chat-header button')) document.getElementById('participantsList').style.display='none';});
 function listenParticipants(){
-  if(!activeGroupId)return;
-  const panel=document.getElementById('participantsList');panel.innerHTML='';
+  if(!activeGroupId) return;
+  const pl=document.getElementById('participantsList'); pl.innerHTML='';
   const ref=db.ref(`groups/${activeGroupId}/users`);
-  ref.off();
-  ref.on('value',snap=>{
-    panel.innerHTML='';
-    snap.forEach(child=>{
-      const p=child.val();
-      const div=document.createElement('div');div.className='participant';div.textContent=p.username;
-      panel.appendChild(div);
-    });
-  });
+  ref.on('value',snap=>{pl.innerHTML=''; snap.forEach(s=>{const u=s.val(); const div=document.createElement('div'); div.className='participant'; div.textContent=u.username; pl.appendChild(div);});});
 }
-
-// Hide participants if click outside
-document.addEventListener('click', e=>{
-  const panel=document.getElementById('participantsPanel');
-  const btn = e.target.closest('button');
-  if(panel.classList.contains('show') && !panel.contains(e.target) && !(btn && btn.innerHTML.includes('fa-users'))){
-    panel.classList.remove('show');
-  }
-});
 </script>
 </body>
 </html>
