@@ -195,12 +195,20 @@ function listenParticipants(){
   });
 }
 
-// Restore last group after refresh
-window.addEventListener('load', async ()=>{
+  // Restore last group after refresh
+window.addEventListener('load', async () => {
   const lastGroup = localStorage.getItem('lastGroupId');
-  if(lastGroup){
+  if (lastGroup) {
     const pwd = prompt(`Enter password for group ${lastGroup}`);
-    if(pwd){
+    if (pwd) {
       activeGroupId = lastGroup;
       encryptionKey = await deriveKey(pwd, activeGroupId);
-      db.ref(`groups/${activeGroupId}/users/${user
+      document.getElementById('chatHeader').textContent = 'Group: ' + activeGroupId;
+      addGroupToList(activeGroupId);
+      listenMessages();
+      listenParticipants();
+    } else {
+      localStorage.removeItem('lastGroupId'); // clear if no password entered
+    }
+  }
+});
