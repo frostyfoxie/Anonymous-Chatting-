@@ -3,38 +3,151 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Anonymous Encrypted Chat</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<title>Discord Lite Chat</title>
 <style>
-body { font-family:sans-serif; background:#f0f2f5; margin:0; padding:20px; display:flex; flex-direction:column; align-items:center;}
-.container { width:100%; max-width:600px; background:white; padding:20px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.1);}
-h1 { text-align:center; color:#4a6cf7;}
-#chat-box { height:300px; overflow-y:auto; border:1px solid #ddd; padding:10px; margin-bottom:15px; border-radius:8px; background:#fafafa;}
-textarea, input { width:100%; padding:10px; margin-bottom:10px; border-radius:6px; border:1px solid #ccc; resize:none;}
-.btn { background:#4a6cf7; color:white; padding:10px 15px; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;}
+  body {margin:0;font-family:Arial,sans-serif;background:#2f3136;color:white;}
+  #app{display:grid;grid-template-columns:220px 1fr; height:100vh;}
+  .sidebar{background:#202225;padding:10px;display:flex;flex-direction:column;align-items:center;}
+  .sidebar input{margin:5px 0;padding:5px;border-radius:5px;border:none;width:90%;}
+  #pfpPreview{width:70px;height:70px;border-radius:50%;margin-bottom:5px;}
+  #chatWindow{background:#36393f;display:flex;flex-direction:column;}
+  #messages{flex:1;padding:10px;overflow-y:auto;}
+  .message{display:flex;margin-bottom:10px;}
+  .message .pfp{border-radius:50%;margin-right:10px;width:40px;height:40px;}
+  .message .content{flex:1;}
+  .username{font-weight:bold;margin-right:5px;}
+  .timestamp{font-size:12px;color:gray;}
+  .text{margin-top:3px;}
+  #inputBar{display:flex;padding:10px;border-top:1px solid #2f3136;}
+  #msgInput{flex:1;padding:8px;border-radius:5px;border:none;}
+  #sendBtn{margin-left:10px;padding:8px 12px;background:#5865f2;border:none;border-radius:5px;color:white;cursor:pointer;}
+  #sendBtn:hover{background:#4752c4;}
+  .deleteBtn{background:red;color:white;border:none;border-radius:3px;padding:2px 5px;margin-left:5px;cursor:pointer;font-size:10px;}
+  .image-preview{max-width:150px;border-radius:5px;margin-top:5px;}
 </style>
 </head>
 <body>
-<div class="container">
-  <h1><i class="fas fa-comments"></i> Anonymous Chat</h1>
 
-  <input type="password" id="password" placeholder="Enter encryption key">
-  <div id="chat-box"></div>
-  <textarea id="plaintext" rows="3" placeholder="Type your message..."></textarea>
-  <button class="btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+<div id="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <img id="pfpPreview" src="https://i.pravatar.cc/70" alt="PFP">
+    <input type="text" id="nickname" placeholder="Enter nickname">
+    <input type="file" id="pfpUpload">
+  </div>
+
+  <!-- Chat Window -->
+  <div id="chatWindow">
+    <div id="messages"></div>
+    <div id="inputBar">
+      <input type="text" id="msgInput" placeholder="Type a message...">
+      <input type="file" id="imageInput">
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
 </div>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, push, set, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
 
-<script>
-// ===== Firebase config =====
-const firebaseConfig = {
-  apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
-  authDomain: "anonymous-chatting-c6712.firebaseapp.com",
-  databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "anonymous-chatting-c6712",
+  const firebaseConfig = {
+    apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
+    authDomain: "anonymous-chatting-c6712.firebaseapp.com",
+    databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "anonymous-chatting-c6712",
+    storageBucket: "anonymous-chatting-c6712.firebasestorage.app",
+    messagingSenderId: "124331866043",
+    appId: "1:124331866043:web:8be37be9d84974b4a0b69e"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const storage = getStorage(app);
+
+  let currentUID = Math.random().toString(36).substring(2,10);
+  let currentPFP = "https://i.pravatar.cc/70";
+
+  // PFP Upload
+  document.getElementById("pfpUpload").addEventListener("change", e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const storageRef = sRef(storage,"pfps/"+currentUID);
+    uploadBytes(storageRef,file).then(()=>getDownloadURL(storageRef)).then(url=>{
+      currentPFP = url;
+      document.getElementById("pfpPreview").src = url;
+    });
+  });
+
+  const messagesRef = ref(db,"messages");
+
+  // Send Message
+  document.getElementById("sendBtn").addEventListener("click", async()=>{
+    const text = document.getElementById("msgInput").value.trim();
+    const nickname = document.getElementById("nickname").value.trim()||"Anon";
+    const imgFile = document.getElementById("imageInput").files[0];
+
+    if(!text && !imgFile) return;
+
+    if(imgFile){
+      const imgRef = sRef(storage,"images/"+Date.now()+"_"+imgFile.name);
+      await uploadBytes(imgRef,imgFile);
+      const imgURL = await getDownloadURL(imgRef);
+      push(messagesRef,{
+        uid: currentUID,
+        nickname,
+        pfp: currentPFP,
+        text: text,
+        image: imgURL,
+        timestamp: Date.now()
+      });
+    } else {
+      push(messagesRef,{
+        uid: currentUID,
+        nickname,
+        pfp: currentPFP,
+        text,
+        image: null,
+        timestamp: Date.now()
+      });
+    }
+
+    document.getElementById("msgInput").value="";
+    document.getElementById("imageInput").value="";
+  });
+
+  // Display Messages
+  onChildAdded(messagesRef,snap=>{
+    const msg = snap.val();
+    const messagesDiv = document.getElementById("messages");
+    const msgDiv = document.createElement("div");
+    msgDiv.classList.add("message");
+    msgDiv.innerHTML = `
+      <img src="${msg.pfp}" class="pfp">
+      <div class="content">
+        <span class="username">${msg.nickname}</span>
+        <span class="timestamp">${new Date(msg.timestamp).toLocaleTimeString()}</span>
+        <div class="text">${msg.text || ""}</div>
+        ${msg.image?'<img src="'+msg.image+'" class="image-preview">':''}
+      </div>
+    `;
+
+    if(msg.uid===currentUID){
+      const delBtn = document.createElement("button");
+      delBtn.innerText="X";
+      delBtn.className="deleteBtn";
+      delBtn.onclick = ()=> remove(ref(db,"messages/"+snap.key));
+      msgDiv.querySelector(".content").appendChild(delBtn);
+    }
+
+    messagesDiv.appendChild(msgDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+</script>
+
+</body>
+</html>  projectId: "anonymous-chatting-c6712",
   storageBucket: "anonymous-chatting-c6712.firebasestorage.app",
   messagingSenderId: "124331866043",
   appId: "1:124331866043:web:8be37be9d84974b4a0b69e",
