@@ -17,7 +17,7 @@ html,body{height:100%;width:100%;overflow:hidden;}
 .join-group{margin-top:15px;display:flex;flex-direction:column;gap:8px;}
 .join-group input{padding:10px;border:none;border-radius:8px;}
 .join-group button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;font-weight:600;}
-.main{flex:1;display:flex;flex-direction:column;}
+.main{flex:1;display:flex;flex-direction:column;height:100%;}
 .chat-header{padding:15px;background:#6366f1;color:white;font-size:1.2rem;}
 .chat-area{flex:1;padding:15px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#f9fafc;}
 .message{padding:12px 16px;border-radius:18px;max-width:70%;word-break:break-word;position:relative;animation:fadeIn 0.3s;}
@@ -99,6 +99,12 @@ async function decryptData(obj) {
   return decrypted;
 }
 
+// Update group activity timestamp
+function updateGroupActivity(){
+  if(!activeGroupId) return;
+  db.ref(`groups/${activeGroupId}/lastActive`).set(Date.now());
+}
+
 // Group join
 async function joinGroup(){
   const gid = document.getElementById('groupIdInput').value.trim();
@@ -107,6 +113,7 @@ async function joinGroup(){
   activeGroupId = gid;
   encryptionKey = await deriveKey(pwd, gid);
   db.ref(`groups/${gid}/users/${userId}`).set({username,lastSeen:Date.now()});
+  updateGroupActivity();
   document.getElementById('chatHeader').textContent='Group: '+gid;
   addGroupToList(gid);
   listenMessages();
@@ -131,6 +138,7 @@ async function sendMessage(){
   msgRef.set({userId,username,encryptedText:encryptedObj,timestamp:Date.now()});
   setTimeout(()=>msgRef.remove(),24*60*60*1000); // 24h
   document.getElementById('messageText').value='';
+  updateGroupActivity();
 }
 
 // Send image
@@ -143,6 +151,7 @@ async function sendImage(event){
   msgRef.set({userId,username,encryptedImage:encryptedObj,timestamp:Date.now()});
   setTimeout(()=>msgRef.remove(),60*1000); // 1 min
   event.target.value='';
+  updateGroupActivity();
 }
 
 // Listen messages
@@ -167,6 +176,28 @@ function listenMessages(){
     chatArea.appendChild(div); chatArea.scrollTop=chatArea.scrollHeight;
   });
 }
+
+// Auto-delete inactive groups (24h)
+setInterval(async()=>{
+  const snapshot=await db.ref('groups').once('value');
+  const groups=snapshot.val()||{};
+  const now=Date.now();
+  const inactiveTime=24*60*60*1000;
+  for(const gid in groups){
+    if(groups[gid].lastActive && now-groups[gid].lastActive>inactiveTime){
+      db.ref(`groups/${gid}`).remove();
+      console.log(`Deleted inactive group: ${gid}`);
+      // Remove from sidebar if visible
+      const items=[...document.querySelectorAll('.group-item')];
+      items.forEach(i=>{if(i.textContent===gid)i.remove()});
+      if(activeGroupId===gid){
+        document.getElementById('chatArea').innerHTML='';
+        document.getElementById('chatHeader').textContent='Select or Join a Group';
+        activeGroupId=null;
+      }
+    }
+  }
+},60*60*1000); // every hour
 </script>
 </body>
 </html>
