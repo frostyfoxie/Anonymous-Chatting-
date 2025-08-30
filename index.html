@@ -95,6 +95,9 @@ if(!username){username=generateUsername();localStorage.setItem('username',userna
 let userId = localStorage.getItem('userId');
 if(!userId){userId=(Math.random().toString(36).substring(2)+Date.now().toString(36));localStorage.setItem('userId',userId);}
 
+// Persistent groups
+let joinedGroups = JSON.parse(localStorage.getItem('joinedGroups') || '[]');
+
 let activeGroupId=null;
 let encryptionKey=null;
 
@@ -120,19 +123,24 @@ async function joinGroup(){
   db.ref(`groups/${gid}/users/${userId}`).set({username,lastSeen:Date.now()});
   updateGroupActivity();
   document.getElementById('chatHeader').textContent='Group: '+gid;
-  addGroupToList(gid);
+  if(!joinedGroups.includes(gid)){joinedGroups.push(gid); localStorage.setItem('joinedGroups',JSON.stringify(joinedGroups));}
+  renderGroupList();
   listenMessages();
   listenParticipants();
 }
 
-// Sidebar
-function addGroupToList(gid){
-  const list=document.getElementById('groupList');
-  if([...list.children].some(c=>c.textContent===gid))return;
-  const div=document.createElement('div');div.className='group-item active';div.textContent=gid;
-  div.onclick=()=>{activeGroupId=gid;document.getElementById('chatHeader').textContent='Group: '+gid; listenMessages(); listenParticipants();}
-  list.appendChild(div);
+// Render groups from localStorage
+function renderGroupList(){
+  const list=document.getElementById('groupList'); list.innerHTML='';
+  joinedGroups.forEach(gid=>{
+    const div=document.createElement('div'); div.className='group-item';
+    if(activeGroupId===gid) div.classList.add('active');
+    div.textContent=gid;
+    div.onclick=()=>{activeGroupId=gid;document.getElementById('chatHeader').textContent='Group: '+gid; listenMessages(); listenParticipants(); renderGroupList();}
+    list.appendChild(div);
+  });
 }
+renderGroupList();
 
 // Send text
 async function sendMessage(){
@@ -192,6 +200,15 @@ function listenParticipants(){
     });
   });
 }
+
+// Hide participants if click outside
+document.addEventListener('click', e=>{
+  const panel=document.getElementById('participantsPanel');
+  const btn = e.target.closest('button');
+  if(panel.classList.contains('show') && !panel.contains(e.target) && !(btn && btn.innerHTML.includes('fa-users'))){
+    panel.classList.remove('show');
+  }
+});
 </script>
 </body>
-        </html>
+</html>
