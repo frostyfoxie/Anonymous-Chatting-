@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enhanced Anonymous Chat</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background: #f5f7fb;
+  color: #333;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#app {
+  width: 100%;
+  max-width: 1200px;
+  height: 90vh;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 5px 30px rgba(0, 0, 0, 0.1);
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar */
+#sidebar {
+  width: 300px;
+  background: #2c3e50;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
+
+.sidebar-header {
+  padding: 20px;
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-header button {
+  flex: 1;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 10px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.sidebar-header button.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.group-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.group-item {
+  padding: 12px 15px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.group-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.group-item-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  background: #3498db;
+}
+
+.join-group, .new-dm {
+  padding: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.join-group input, .new-dm input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.join-group button, .new-dm button {
+  width: 100%;
+  padding: 10px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.join-group button:hover, .new-dm button:hover {
+  background: #2980b9;
+}
+
+/* Main Chat Area */
+#chatContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+#chatHeader {
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+}
+
+.chat-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.chat-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #3498db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 18px;
+  background-size: cover;
+  background-position: center;
+}
+
+#participantsToggle {
+  background: none;
+  border: none;
+  color: #7f8c8d;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 5px;
+}
+
+#profileToggle {
+  background: none;
+  border: none;
+  color: #7f8c8d;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 5px;
+  margin-right: 10px;
+}
+
+/* Message Container */
+.message-container {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: #fafbfc;
+}
+
+.message {
+  max-width: 70%;
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.message.incoming {
+  align-items: flex-start;
+}
+
+.message.outgoing {
+  align-items: flex-end;
+  margin-left: auto;
+}
+
+.message-content {
+  display: flex;
+  align-items: flex-start;
+  max-width: 100%;
+}
+
+.message-avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  margin-right: 10px;
+  background: #3498db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.message-body {
+  flex: 1;
+}
+
+.message .sender {
+  font-size: 12px;
+  color: #7f8c8d;
+  margin-bottom: 5px;
+}
+
+.message .text {
+  padding: 12px 15px;
+  border-radius: 18px;
+  word-break: break-word;
+}
+
+.incoming .text {
+  background: #e6eaed;
+  border-top-left-radius: 4px;
+  color: #2c3e50;
+}
+
+.outgoing .text {
+  background: #3498db;
+  border-top-right-radius: 4px;
+  color: white;
+}
+
+.message a {
+  color: #3498db;
+  text-decoration: underline;
+}
+
+/* Message Input */
+#messageInputContainer {
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #eee;
+  background: white;
+}
+
+#messageText {
+  flex: 1;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 24px;
+  resize: none;
+  max-height: 120px;
+  outline: none;
+  font-size: 14px;
+}
+
+#messageText:focus {
+  border-color: #3498db;
+}
+
+.attach-btn {
+  position: relative;
+  cursor: pointer;
+  color: #7f8c8d;
+  font-size: 18px;
+}
+
+.attach-btn input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.send-btn {
+  background: #3498db;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.send-btn:hover {
+  background: #2980b9;
+}
+
+/* Participants Panel */
+#participantsPanel {
+  width: 250px;
+  background: white;
+  border-left: 1px solid #eee;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.participant-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f1f1;
+  display: flex;
+  align-items: center;
+}
+
+.participant-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  margin-right: 10px;
+  background: #3498db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Profile Modal */
+#profileModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.profile-content {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 5px 30px rgba(0, 0, 0, 0.2);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-right: 20px;
+  background: #3498db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 32px;
+  cursor: pointer;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.avatar-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.profile-avatar:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.avatar-overlay i {
+  font-size: 24px;
+  color: white;
+}
+
+.profile-info h2 {
+  margin-bottom: 5px;
+}
+
+.profile-info p {
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.profile-form {
+  margin-top: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.form-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-cancel {
+  background: #e6eaed;
+  color: #2c3e50;
+}
+
+.btn-save {
+  background: #3498db;
+  color: white;
+}
+
+.btn-save:hover {
+  background: #2980b9;
+}
+
+/* Utilities */
+.hidden {
+  display: none !important;
+}
+
+#sidebarToggle {
+  display: none;
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  z-index: 100;
+  background: #3498db;
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  #app {
+    height: 100vh;
+    border-radius: 0;
+  }
+  
+  #sidebar {
+    position: absolute;
+    height: 100%;
+    z-index: 10;
+    transform: translateX(-100%);
+  }
+  
+  #sidebar.show {
+    transform: translateX(0);
+  }
+  
+  #sidebarToggle {
+    display: flex;
+  }
+  
+  #participantsPanel {
+    position: absolute;
+    right: 0;
+    height: 100%;
+    z-index: 10;
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .message {
+    max-width: 85%;
+  }
+}
+
+/* Loading animation */
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.pulse {
+  animation: pulse 1.5s infinite;
+}
+
+/* Avatar colors based on user ID */
+.avatar-color-0 { background: #3498db; }
+.avatar-color-1 { background: #e74c3c; }
+.avatar-color-2 { background: #2ecc71; }
+.avatar-color-3 { background: #f39c12; }
+.avatar-color-4 { background: #9b59b6; }
+.avatar-color-5 { background: #1abc9c; }
+.avatar-color-6 { background: #d35400; }
+.avatar-color-7 { background: #c0392b; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Mobile Sidebar Toggle -->
+  <button id="sidebarToggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <button id="groupTab" class="active" onclick="showGroups()">Groups</button>
+      <button id="dmTab" onclick="showDMs()">DMs</button>
+    </div>
+
+    <!-- Groups -->
+    <div id="groupList" class="group-list"></div>
+    <div class="join-group">
+      <input type="text" id="groupIdInput" placeholder="Group ID">
+      <input type="password" id="groupPasswordInput" placeholder="Password">
+      <button onclick="joinGroup()">Join/Create</button>
+    </div>
+
+    <!-- DMs -->
+    <div id="dmList" class="group-list hidden"></div>
+    <div class="new-dm hidden">
+      <input type="text" id="dmUserInput" placeholder="User ID">
+      <button onclick="startDM()">Start DM</button>
+    </div>
+  </div>
+
+  <!-- Main Chat Area -->
+  <div id="chatContainer">
+    <div id="chatHeader">
+      <div class="chat-info">
+        <div class="chat-avatar" id="chatAvatar">G</div>
+        <div>
+          <h2 id="chatTitle">Select or Join a Group</h2>
+        </div>
+      </div>
+      <div>
+        <button id="profileToggle" title="Profile"><i class="fas fa-user-cog"></i></button>
+        <button id="participantsToggle" title="Participants"><i class="fas fa-users"></i></button>
+      </div>
+    </div>
+
+    <div id="chatArea" class="message-container"></div>
+
+    <div id="messageInputContainer">
+      <textarea id="messageText" placeholder="Type your message..." rows="1"></textarea>
+      <label class="attach-btn">
+        <i class="fas fa-paperclip"></i>
+        <input type="file" id="fileUpload" onchange="sendFile(event)">
+      </label>
+      <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <!-- Participants Panel -->
+  <div id="participantsPanel" class="hidden">
+    <h3>Participants</h3>
+    <div id="participantsList"></div>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profileModal" class="hidden">
+    <div class="profile-content">
+      <div class="profile-header">
+        <div class="profile-avatar" id="profileAvatar" onclick="triggerAvatarUpload()">
+          <div class="avatar-overlay">
+            <i class="fas fa-camera"></i>
+          </div>
+        </div>
+        <div class="profile-info">
+          <h2 id="profileUsername">User</h2>
+          <p id="profileUserId">ID: loading...</p>
+        </div>
+      </div>
+      <div class="profile-form">
+        <div class="form-group">
+          <label for="usernameInput">Username</label>
+          <input type="text" id="usernameInput" placeholder="Enter username">
+        </div>
+        <input type="file" id="avatarUpload" accept="image/*" class="hidden" onchange="handleAvatarUpload(event)">
+        <div class="form-actions">
+          <button class="btn-cancel" onclick="closeProfileModal()">Cancel</button>
+          <button class="btn-save" onclick="saveProfile()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script>
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
+  authDomain: "anonymous-chatting-c6712.firebaseapp.com",
+  databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "anonymous-chatting-c6712",
+  storageBucket: "anonymous-chatting-c6712.appspot.com",
+  messagingSenderId: "124331866043",
+  appId: "1:124331866043:web:8be37be9d84974b4a0b69e"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// User data with profile persistence
+let userData = JSON.parse(localStorage.getItem('userData')) || {};
+let userId = userData.userId || (Math.random().toString(36).substring(2)+Date.now().toString(36));
+let username = userData.username || 'User'+Math.floor(Math.random()*1000);
+let userAvatar = userData.avatar || null;
+let userColor = userData.color || Math.floor(Math.random() * 8);
+
+// Save user data to localStorage
+function saveUserData() {
+  userData = {
+    userId,
+    username,
+    avatar: userAvatar,
+    color: userColor,
+    joinedGroups: userData.joinedGroups || [],
+    startedDMs: userData.startedDMs || []
+  };
+  localStorage.setItem('userData', JSON.stringify(userData));
+}
+
+// Initialize user data
+if (!userData.userId) {
+  saveUserData();
+}
+
+// State
+let activeGroupId = null, activeDMId = null, encryptionKey = null, participantsVisible = false;
+
+// AES key derivation
+async function deriveKey(password,saltStr){
+  const salt=new TextEncoder().encode(saltStr);
+  const keyMaterial=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),{name:'PBKDF2'},false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+
+// Encrypt/Decrypt
+async function encryptData(data){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const enc=await crypto.subtle.encrypt({name:'AES-GCM',iv},encryptionKey,data);
+  return {iv:Array.from(iv),data:btoa(String.fromCharCode(...new Uint8Array(enc)))};
+}
+
+async function decryptData(obj){
+  return await crypto.subtle.decrypt(
+    {name:'AES-GCM',iv:new Uint8Array(obj.iv)},
+    encryptionKey,
+    Uint8Array.from(atob(obj.data),c=>c.charCodeAt(0))
+  );
+}
+
+// ===== Groups =====
+async function joinGroup(){
+  const gid=document.getElementById('groupIdInput').value.trim();
+  const pwd=document.getElementById('groupPasswordInput').value;
+  if(!gid||!pwd) return alert('Enter group ID & password');
+  
+  try {
+    activeGroupId=gid; 
+    activeDMId=null;
+    encryptionKey=await deriveKey(pwd,gid);
+    
+    // Add user to group participants
+    db.ref(`groups/${gid}/users/${userId}`).set({
+      username, 
+      avatar: userAvatar,
+      color: userColor,
+      lastSeen: Date.now(),
+      joined: Date.now()
+    });
+    
+    // Add to user's joined groups if not already there
+    if (!userData.joinedGroups.includes(gid)) {
+      userData.joinedGroups.push(gid);
+      saveUserData();
+    }
+    
+    updateHeader('Group: '+gid, gid[0].toUpperCase());
+    addGroupToList(gid); 
+    listenMessages();
+    loadParticipants();
+    
+    // Clear input fields
+    document.getElementById('groupIdInput').value = '';
+    document.getElementById('groupPasswordInput').value = '';
+    
+  } catch(error) {
+    console.error("Error joining group:", error);
+    alert("Failed to join group. Please try again.");
+  }
+}
+
+function addGroupToList(gid){
+  const list=document.getElementById('groupList');
+  if([...list.children].some(c=>c.getAttribute('data-id')===gid)) return;
+  
+  const div=document.createElement('div'); 
+  div.className='group-item'; 
+  div.setAttribute('data-id', gid);
+  div.innerHTML = `
+    <div class="group-item-avatar">${gid[0].toUpperCase()}</div>
+    <div>${gid}</div>
+  `;
+  div.onclick=()=>{
+    // We'll need to prompt for password when switching to a group
+    const password = prompt("Enter password for " + gid);
+    if (password) {
+      document.getElementById('groupPasswordInput').value = password;
+      activeGroupId=gid;
+      activeDMId=null;
+      deriveKey(password, gid).then(key => {
+        encryptionKey = key;
+        updateHeader('Group: '+gid, gid[0].toUpperCase());
+        listenMessages();
+        loadParticipants();
+        if(window.innerWidth<=768) toggleSidebar();
+      });
+    }
+  };
+  list.appendChild(div);
+}
+
+async function sendMessage(){
+  const text=document.getElementById('messageText').value.trim(); 
+  if(!text) return;
+  
+  try {
+    if(activeGroupId){
+      const encryptedObj=await encryptData(new TextEncoder().encode(text));
+      const msgRef=db.ref(`groups/${activeGroupId}/messages`).push();
+      msgRef.set({
+        userId,
+        username,
+        avatar: userAvatar,
+        color: userColor,
+        encryptedText:encryptedObj,
+        timestamp:Date.now()
+      });
+    } else if(activeDMId){
+      const msgRef=db.ref(`dms/${activeDMId}/messages`).push();
+      msgRef.set({
+        userId,
+        username,
+        avatar: userAvatar,
+        color: userColor,
+        text,
+        timestamp:Date.now()
+      });
+    }
+    document.getElementById('messageText').value='';
+    autoResizeTextarea();
+  } catch(error) {
+    console.error("Error sending message:", error);
+    alert("Failed to send message. Please try again.");
+  }
+}
+
+async function sendFile(event){
+  const file=event.target.files[0]; 
+  if(!file) return;
+  
+  try {
+    if(activeGroupId){
+      const buffer=await file.arrayBuffer(); 
+      const encryptedObj=await encryptData(buffer);
+      const msgRef=db.ref(`groups/${activeGroupId}/messages`).push();
+      msgRef.set({
+        userId,
+        username,
+        avatar: userAvatar,
+        color: userColor,
+        encryptedFile:encryptedObj,
+        filename:file.name,
+        timestamp:Date.now()
+      });
+    } else if(activeDMId){
+      const reader=new FileReader();
+      reader.onload=()=>{ 
+        db.ref(`dms/${activeDMId}/messages`).push().set({
+          userId,
+          username,
+          avatar: userAvatar,
+          color: userColor,
+          file:reader.result,
+          filename:file.name,
+          timestamp:Date.now()
+        }); 
+      };
+      reader.readAsDataURL(file);
+    }
+    event.target.value='';
+  } catch(error) {
+    console.error("Error sending file:", error);
+    alert("Failed to send file. Please try again.");
+  }
+}
+
+function listenMessages(){
+  if(!activeGroupId) return;
+  
+  const chatArea=document.getElementById('chatArea'); 
+  chatArea.innerHTML='<div class="message pulse">Loading messages...</div>';
+  
+  const ref=db.ref(`groups/${activeGroupId}/messages`);
+  ref.off(); 
+  
+  ref.on('child_added',async snap=>{
+    const msg=snap.val(); 
+    const div=document.createElement('div'); 
+    div.classList.add('message', msg.userId===userId?'outgoing':'incoming');
+    
+    const avatarStyle = msg.avatar ? `background-image: url('${msg.avatar}')` : '';
+    const avatarEl = `<div class="message-avatar avatar-color-${msg.color || 0}" style="${avatarStyle}">${msg.avatar ? '' : (msg.username || 'U').charAt(0).toUpperCase()}</div>`;
+    
+    try{
+      if(msg.encryptedText){ 
+        const decrypted=new TextDecoder().decode(await decryptData(msg.encryptedText)); 
+        div.innerHTML=`
+          <div class="message-content">
+            ${msg.userId !== userId ? avatarEl : ''}
+            <div class="message-body">
+              <div class="sender">${msg.username}</div>
+              <div class="text">${decrypted}</div>
+            </div>
+            ${msg.userId === userId ? avatarEl : ''}
+          </div>
+        `; 
+      }
+      else if(msg.encryptedFile){ 
+        const decrypted=new Blob([await decryptData(msg.encryptedFile)]); 
+        const url=URL.createObjectURL(decrypted); 
+        div.innerHTML=`
+          <div class="message-content">
+            ${msg.userId !== userId ? avatarEl : ''}
+            <div class="message-body">
+              <div class="sender">${msg.username}</div>
+              <div class="text"><a href="${url}" download="${msg.filename}">${msg.filename}</a></div>
+            </div>
+            ${msg.userId === userId ? avatarEl : ''}
+          </div>
+        `; 
+      }
+    } catch(e) {
+      console.error("Decryption error:", e);
+      div.innerHTML=`
+        <div class="message-content">
+          ${msg.userId !== userId ? avatarEl : ''}
+          <div class="message-body">
+            <div class="sender">${msg.username}</div>
+            <div class="text">[Cannot decrypt - wrong password?]</div>
+          </div>
+          ${msg.userId === userId ? avatarEl : ''}
+        </div>
+      `;
+    }
+    
+    // Remove loading message if it exists
+    const loadingMsg = chatArea.querySelector('.pulse');
+    if (loadingMsg) loadingMsg.remove();
+    
+    chatArea.appendChild(div); 
+    chatArea.scrollTop=chatArea.scrollHeight;
+  });
+}
+
+// ===== DMs =====
+function startDM(){
+  const otherId=document.getElementById('dmUserInput').value.trim(); 
+  if(!otherId) return alert('Enter User ID');
+  
+  activeDMId=[userId,otherId].sort().join('_'); 
+  activeGroupId=null; 
+  encryptionKey=null;
+  
+  // Add to user's started DMs if not already there
+  if (!userData.startedDMs.includes(otherId)) {
+    userData.startedDMs.push(otherId);
+    saveUserData();
+  }
+  
+  updateHeader('DM: '+otherId, otherId[0].toUpperCase()); 
+  addDMToList(otherId); 
+  listenDMMessages();
+  
+  // Clear input field
+  document.getElementById('dmUserInput').value = '';
+}
+
+function addDMToList(otherId){
+  const list=document.getElementById('dmList');
+  if([...list.children].some(c=>c.getAttribute('data-id')===otherId)) return;
+  
+  const div=document.createElement('div'); 
+  div.className='group-item'; 
+  div.setAttribute('data-id', otherId);
+  div.innerHTML = `
+    <div class="group-item-avatar">${otherId[0].toUpperCase()}</div>
+    <div>${otherId}</div>
+  `;
+  div.onclick=()=>{
+    activeDMId=[userId,otherId].sort().join('_'); 
+    activeGroupId=null; 
+    updateHeader('DM: '+otherId, otherId[0].toUpperCase()); 
+    listenDMMessages(); 
+    if(window.innerWidth<=768) toggleSidebar();
+  };
+  list.appendChild(div);
+}
+
+function listenDMMessages(){
+  if(!activeDMId) return;
+  
+  const chatArea=document.getElementById('chatArea'); 
+  chatArea.innerHTML='<div class="message pulse">Loading messages...</div>';
+  
+  const ref=db.ref(`dms/${activeDMId}/messages`);
+  ref.off(); 
+  
+  ref.on('child_added', snap=>{
+    const msg=snap.val(); 
+    const div=document.createElement('div'); 
+    div.classList.add('message', msg.userId===userId?'outgoing':'incoming');
+    
+    const avatarStyle = msg.avatar ? `background-image: url('${msg.avatar}')` : '';
+    const avatarEl = `<div class="message-avatar avatar-color-${msg.color || 0}" style="${avatarStyle}">${msg.avatar ? '' : (msg.username || 'U').charAt(0).toUpperCase()}</div>`;
+    
+    if(msg.text) {
+      div.innerHTML=`
+        <div class="message-content">
+          ${msg.userId !== userId ? avatarEl : ''}
+          <div class="message-body">
+            <div class="sender">${msg.username}</div>
+            <div class="text">${msg.text}</div>
+          </div>
+          ${msg.userId === userId ? avatarEl : ''}
+        </div>
+      `;
+    } else if(msg.file) {
+      div.innerHTML=`
+        <div class="message-content">
+          ${msg.userId !== userId ? avatarEl : ''}
+          <div class="message-body">
+            <div class="sender">${msg.username}</div>
+            <div class="text"><a href="${msg.file}" download="${msg.filename}">${msg.filename}</a></div>
+          </div>
+          ${msg.userId === userId ? avatarEl : ''}
+        </div>
+      `;
+    }
+    
+    // Remove loading message if it exists
+    const loadingMsg = chatArea.querySelector('.pulse');
+    if (loadingMsg) loadingMsg.remove();
+    
+    chatArea.appendChild(div); 
+    chatArea.scrollTop=chatArea.scrollHeight;
+  });
+}
+
+// ===== Participants =====
+function loadParticipants() {
+  if (!activeGroupId) return;
+  
+  const participantsList = document.getElementById('participantsList');
+  participantsList.innerHTML = '';
+  
+  const ref = db.ref(`groups/${activeGroupId}/users`);
+  ref.on('value', snap => {
+    const users = snap.val();
+    participantsList.innerHTML = '';
+    
+    if (users) {
+      Object.entries(users).forEach(([id, user]) => {
+        const div = document.createElement('div');
+        div.className = 'participant-item';
+        
+        const avatarStyle = user.avatar ? `background-image: url('${user.avatar}')` : '';
+        div.innerHTML = `
+          <div class="participant-avatar avatar-color-${user.color || 0}" style="${avatarStyle}">
+            ${user.avatar ? '' : (user.username || 'U').charAt(0).toUpperCase()}
+          </div>
+          <div>${user.username}${id === userId ? ' (You)' : ''}</div>
+        `;
+        participantsList.appendChild(div);
+      });
+    }
+  });
+}
+
+// ===== Profile Management =====
+function openProfileModal() {
+  document.getElementById('profileModal').classList.remove('hidden');
+  document.getElementById('usernameInput').value = username;
+  document.getElementById('profileUsername').textContent = username;
+  document.getElementById('profileUserId').textContent = `ID: ${userId}`;
+  
+  const profileAvatar = document.getElementById('profileAvatar');
+  if (userAvatar) {
+    profileAvatar.style.backgroundImage = `url('${userAvatar}')`;
+    profileAvatar.textContent = '';
+  } else {
+    profileAvatar.style.backgroundImage = '';
+    profileAvatar.textContent = username.charAt(0).toUpperCase();
+    profileAvatar.className = `profile-avatar avatar-color-${userColor}`;
+  }
+}
+
+function closeProfileModal() {
+  document.getElementById('profileModal').classList.add('hidden');
+}
+
+function triggerAvatarUpload() {
+  document.getElementById('avatarUpload').click();
+}
+
+function handleAvatarUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    userAvatar = e.target.result;
+    const profileAvatar = document.getElementById('profileAvatar');
+    profileAvatar.style.backgroundImage = `url('${userAvatar}')`;
+    profileAvatar.textContent = '';
+    profileAvatar.className = 'profile-avatar';
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveProfile() {
+  const newUsername = document.getElementById('usernameInput').value.trim();
+  if (newUsername) {
+    username = newUsername;
+    
+    // Update user in any active groups
+    if (activeGroupId) {
+      db.ref(`groups/${activeGroupId}/users/${userId}`).update({
+        username: username,
+        avatar: userAvatar,
+        color: userColor
+      });
+    }
+    
+    saveUserData();
+    closeProfileModal();
+    
+    // Update UI
+    updateProfileUI();
+  }
+}
+
+function updateProfileUI() {
+  const chatAvatar = document.getElementById('chatAvatar');
+  if (userAvatar) {
+    chatAvatar.style.backgroundImage = `url('${userAvatar}')`;
+    chatAvatar.textContent = '';
+  } else {
+    chatAvatar.style.backgroundImage = '';
+    chatAvatar.textContent = username.charAt(0).toUpperCase();
+    chatAvatar.className = `chat-avatar avatar-color-${userColor}`;
+  }
+}
+
+// ===== Header & Sidebar =====
+function updateHeader(title, avatar){ 
+  document.getElementById('chatTitle').textContent=title; 
+  
+  const chatAvatar = document.getElementById('chatAvatar');
+  chatAvatar.textContent = avatar;
+  chatAvatar.className = `chat-avatar avatar-color-${userColor}`;
+  
+  // Show/hide participants button based on context
+  document.getElementById('participantsToggle').style.display = 
+    activeGroupId ? 'block' : 'none';
+}
+
+function showGroups(){ 
+  document.getElementById('groupList').classList.remove('hidden'); 
+  document.querySelector('.join-group').classList.remove('hidden'); 
+  document.getElementById('dmList').classList.add('hidden'); 
+  document.querySelector('.new-dm').classList.add('hidden'); 
+  document.getElementById('groupTab').classList.add('active'); 
+  document.getElementById('dmTab').classList.remove('active'); 
+}
+
+function showDMs(){ 
+  document.getElementById('groupList').classList.add('hidden'); 
+  document.querySelector('.join-group').classList.add('hidden'); 
+  document.getElementById('dmList').classList.remove('hidden'); 
+  document.querySelector('.new-dm').classList.remove('hidden'); 
+  document.getElementById('groupTab').classList.remove('active'); 
+  document.getElementById('dmTab').classList.add('active'); 
+}
+
+// Participants Panel Toggle
+document.getElementById('participantsToggle').addEventListener('click',()=>{ 
+  participantsVisible=!participantsVisible; 
+  document.getElementById('participantsPanel').classList.toggle('hidden',!participantsVisible); 
+});
+
+// Profile Toggle
+document.getElementById('profileToggle').addEventListener('click', openProfileModal);
+
+// Mobile Sidebar Toggle
+function toggleSidebar(){ 
+  document.getElementById('sidebar').classList.toggle('show'); 
+}
+
+// Auto-resize textarea
+function autoResizeTextarea() {
+  const textarea = document.getElementById('messageText');
+  textarea.style.height = 'auto';
+  textarea.style.height = (textarea.scrollHeight) + 'px';
+}
+
+// Load previous groups and DMs from localStorage
+function loadPreviousConversations() {
+  // Load joined groups
+  if (userData.joinedGroups) {
+    userData.joinedGroups.forEach(groupId => {
+      addGroupToList(groupId);
+    });
+  }
+  
+  // Load started DMs
+  if (userData.startedDMs) {
+    userData.startedDMs.forEach(userId => {
+      addDMToList(userId);
+    });
+  }
+}
+
+// Event listeners
+document.getElementById('messageText').addEventListener('input', autoResizeTextarea);
+document.getElementById('messageText').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Initialize UI
+updateHeader('Select or Join a Group', 'G');
+updateProfileUI();
+loadPreviousConversations();
+</script>
+</body>
+</html>
