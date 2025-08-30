@@ -9,50 +9,64 @@
 </head>
 <body>
 <div id="app">
-    <!-- Sidebar -->
-    <div id="sidebar">
-        <div class="sidebar-header">
-            <h2>Chats</h2>
-        </div>
-        <div id="groupList" class="group-list"></div>
-        <div class="join-group">
-            <input type="text" id="groupIdInput" placeholder="Group ID">
-            <input type="password" id="groupPasswordInput" placeholder="Password">
-            <button onclick="joinGroup()">Join/Create</button>
-        </div>
+
+  <!-- Mobile Sidebar Toggle -->
+  <button id="sidebarToggle" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <button id="groupTab" class="active" onclick="showGroups()">Groups</button>
+      <button id="dmTab" onclick="showDMs()">DMs</button>
     </div>
 
-    <!-- Main Chat Area -->
-    <div id="chatContainer">
-        <div id="chatHeader">
-            <div class="chat-info">
-                <div class="chat-avatar" id="chatAvatar">G</div>
-                <div>
-                    <h2 id="chatTitle">Select or Join a Group</h2>
-                    <p id="chatSubTitle"></p>
-                </div>
-            </div>
-            <button id="participantsToggle" title="Participants"><i class="fas fa-users"></i></button>
-        </div>
-
-        <div id="chatArea" class="message-container"></div>
-
-        <div id="messageInputContainer">
-            <textarea id="messageText" placeholder="Type your message..." rows="1"></textarea>
-            <label class="attach-btn">
-                <i class="fas fa-paperclip"></i>
-                <input type="file" id="fileUpload" onchange="sendFile(event)">
-            </label>
-            <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
-        </div>
+    <!-- Groups -->
+    <div id="groupList" class="group-list"></div>
+    <div class="join-group">
+      <input type="text" id="groupIdInput" placeholder="Group ID">
+      <input type="password" id="groupPasswordInput" placeholder="Password">
+      <button onclick="joinGroup()">Join/Create</button>
     </div>
 
-    <!-- Participants Panel -->
-    <div id="participantsPanel" class="hidden"></div>
+    <!-- DMs -->
+    <div id="dmList" class="group-list hidden"></div>
+    <div class="new-dm hidden">
+      <input type="text" id="dmUserInput" placeholder="User ID">
+      <button onclick="startDM()">Start DM</button>
+    </div>
+  </div>
+
+  <!-- Main Chat Area -->
+  <div id="chatContainer">
+    <div id="chatHeader">
+      <div class="chat-info">
+        <div class="chat-avatar" id="chatAvatar">G</div>
+        <div>
+          <h2 id="chatTitle">Select or Join a Group</h2>
+        </div>
+      </div>
+      <button id="participantsToggle" title="Participants"><i class="fas fa-users"></i></button>
+    </div>
+
+    <div id="chatArea" class="message-container"></div>
+
+    <div id="messageInputContainer">
+      <textarea id="messageText" placeholder="Type your message..." rows="1"></textarea>
+      <label class="attach-btn">
+        <i class="fas fa-paperclip"></i>
+        <input type="file" id="fileUpload" onchange="sendFile(event)">
+      </label>
+      <button class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <!-- Participants Panel -->
+  <div id="participantsPanel" class="hidden"></div>
+
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="app.js"></script>
 </body>
-  </html>
+</html>
