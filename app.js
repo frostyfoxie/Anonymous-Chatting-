@@ -1,4 +1,4 @@
-// Firebase initialization
+// --- Firebase Setup ---
 const firebaseConfig = {
   apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
   authDomain: "anonymous-chatting-c6712.firebaseapp.com",
@@ -11,206 +11,227 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// --- Persistent Username & Avatar ---
-let username = localStorage.getItem('username');
-let avatar = localStorage.getItem('avatar');
-if(!username){
-  const adjectives = ['Mysterious','Anonymous','Secret','Hidden','Stealthy','Private','Unknown','Incognito','Covert','Discreet'];
-  const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
-  username = adjectives[Math.floor(Math.random()*adjectives.length)] + nouns[Math.floor(Math.random()*nouns.length)] + Math.floor(Math.random()*1000);
-  localStorage.setItem('username', username);
+// --- Persistent Username + Avatar ---
+const adjectives = ['Mysterious','Anonymous','Hidden','Secret','Stealthy','Covert','Incognito','Unknown','Private','Discreet'];
+const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
+function generateUsername() {
+  return adjectives[Math.floor(Math.random()*adjectives.length)] +
+         nouns[Math.floor(Math.random()*nouns.length)] +
+         Math.floor(Math.random()*1000);
 }
-if(!avatar){
-  avatar = `https://api.dicebear.com/5.x/identicon/svg?seed=${username}`;
-  localStorage.setItem('avatar', avatar);
+function generateAvatar() {
+  const colors = ['#f87171','#34d399','#60a5fa','#facc15','#a78bfa','#fb7185','#fbbf24','#3b82f6'];
+  return colors[Math.floor(Math.random()*colors.length)];
 }
+
+let userId = localStorage.getItem('userId') || (Math.random().toString(36).substr(2)+Date.now().toString(36));
+localStorage.setItem('userId', userId);
+
+let username = localStorage.getItem('username') || generateUsername();
+localStorage.setItem('username', username);
+
+let avatar = localStorage.getItem('avatar') || generateAvatar();
+localStorage.setItem('avatar', avatar);
 
 // --- State ---
-let userId = localStorage.getItem('userId') || (Math.random().toString(36).substring(2)+Date.now().toString(36));
-localStorage.setItem('userId', userId);
 let activeGroupId = null;
-let activeDMUserId = null;
+let activeDMUser = null;
 let encryptionKey = null;
 
-// --- AES-GCM helpers ---
-async function deriveKey(password, saltStr){
+// --- AES-GCM Helpers ---
+async function deriveKey(password, saltStr) {
   const salt = new TextEncoder().encode(saltStr);
-  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'}, keyMaterial, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt, iterations:100000, hash:'SHA-256'},
+    keyMaterial, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']
+  );
 }
 
-async function encryptData(data){
+async function encryptData(data) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({name:'AES-GCM',iv}, encryptionKey, data);
-  return {iv:Array.from(iv), data:btoa(String.fromCharCode(...new Uint8Array(encrypted)))};
+  const encrypted = await crypto.subtle.encrypt({name:'AES-GCM', iv}, encryptionKey, data);
+  return {iv: Array.from(iv), data: btoa(String.fromCharCode(...new Uint8Array(encrypted)))};
 }
 
-async function decryptData(obj){
-  return await crypto.subtle.decrypt({name:'AES-GCM', iv:new Uint8Array(obj.iv)}, encryptionKey, Uint8Array.from(atob(obj.data), c=>c.charCodeAt(0)));
+async function decryptData(obj) {
+  return await crypto.subtle.decrypt(
+    {name:'AES-GCM', iv: new Uint8Array(obj.iv)},
+    encryptionKey,
+    Uint8Array.from(atob(obj.data), c=>c.charCodeAt(0))
+  );
 }
 
-// --- Join / Create Group ---
-async function joinGroup(){
+// --- Update Activity ---
+function updateGroupActivity() {
+  if(!activeGroupId) return;
+  db.ref(`groups/${activeGroupId}/lastActive`).set(Date.now());
+}
+
+// --- Join or Create Group ---
+async function joinGroup() {
   const gid = document.getElementById('groupIdInput').value.trim();
   const pwd = document.getElementById('groupPasswordInput').value;
-  if(!gid || !pwd) return alert('Enter Group ID & Password');
-  
+  if(!gid || !pwd) return alert('Enter Group ID and Password');
+
   activeGroupId = gid;
-  activeDMUserId = null;
   encryptionKey = await deriveKey(pwd, gid);
 
-  db.ref(`groups/${gid}/users/${userId}`).set({username, avatar, lastSeen:Date.now()});
-  db.ref(`groups/${gid}/lastActive`).set(Date.now());
+  // Add user to group
+  db.ref(`groups/${gid}/users/${userId}`).set({
+    username,
+    avatar,
+    lastSeen: Date.now(),
+    createdBy: userId
+  });
 
-  addGroupToList(gid);
+  updateGroupActivity();
   document.getElementById('chatHeader').textContent = 'Group: ' + gid;
+  addGroupToList(gid);
   listenMessages();
-  updateParticipants();
+  listenParticipants();
 }
 
-// --- Sidebar Group List ---
-function addGroupToList(gid){
+// --- Sidebar Groups ---
+function addGroupToList(gid) {
   const list = document.getElementById('groupList');
-  if([...list.children].some(c=>c.textContent===gid)) return;
+  if([...list.children].some(c=>c.dataset.gid === gid)) return;
   const div = document.createElement('div');
-  div.className = 'group-item active';
-  div.textContent = gid;
-  div.onclick = () => {
-    activeGroupId = gid;
-    activeDMUserId = null;
-    document.getElementById('chatHeader').textContent = 'Group: ' + gid;
-    listenMessages();
-    updateParticipants();
-  }
+  div.className = 'group-item';
+  div.dataset.gid = gid;
+  div.innerText = gid;
+  div.onclick = () => { activeGroupId = gid; activeDMUser = null; document.getElementById('chatHeader').textContent = 'Group: '+gid; listenMessages(); listenParticipants();}
   list.appendChild(div);
 }
 
-// --- Send Message ---
-async function sendMessage(){
+// --- Send Text ---
+async function sendMessage() {
+  if(activeDMUser) return sendDM();
+  if(!activeGroupId) return alert('Select a group first!');
   const text = document.getElementById('messageText').value.trim();
   if(!text) return;
 
-  let ref;
-  let payload = {userId, username, avatar, timestamp: Date.now()};
-  
-  if(activeDMUserId){
-    const key = [userId, activeDMUserId].sort().join('_');
-    ref = db.ref(`dms/${key}`).push();
-    payload.textIfDM = text;
-  } else {
-    ref = db.ref(`groups/${activeGroupId}/messages`).push();
-    payload.encryptedText = await encryptData(new TextEncoder().encode(text));
-  }
-
-  ref.set(payload);
-  document.getElementById('messageText').value = '';
-  if(!activeDMUserId) setTimeout(()=>ref.remove(), 24*60*60*1000);
-  if(!activeDMUserId) db.ref(`groups/${activeGroupId}/lastActive`).set(Date.now());
+  const encryptedObj = await encryptData(new TextEncoder().encode(text));
+  const msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
+  msgRef.set({userId, username, avatar, encryptedText: encryptedObj, timestamp: Date.now()});
+  setTimeout(()=>msgRef.remove(), 24*60*60*1000); // 24h
+  document.getElementById('messageText').value='';
+  updateGroupActivity();
 }
 
 // --- Send Image ---
-async function sendImage(event){
+async function sendImage(event) {
+  if(activeDMUser) return sendDMImage(event);
+  if(!activeGroupId) return alert('Select a group first!');
   const file = event.target.files[0]; if(!file) return;
   const arrayBuffer = await file.arrayBuffer();
-
-  let ref;
-  let payload = {userId, username, avatar, timestamp: Date.now()};
-  if(activeDMUserId){
-    const key = [userId, activeDMUserId].sort().join('_');
-    ref = db.ref(`dms/${key}`).push();
-    payload.imageIfDM = URL.createObjectURL(new Blob([arrayBuffer]));
-  } else {
-    ref = db.ref(`groups/${activeGroupId}/messages`).push();
-    payload.encryptedImage = await encryptData(arrayBuffer);
-  }
-
-  ref.set(payload);
+  const encryptedObj = await encryptData(arrayBuffer);
+  const msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
+  msgRef.set({userId, username, avatar, encryptedImage: encryptedObj, timestamp: Date.now()});
+  setTimeout(()=>msgRef.remove(), 60*1000); // 1 min
   event.target.value='';
-  if(!activeDMUserId) setTimeout(()=>ref.remove(),60*1000);
-  if(!activeDMUserId) db.ref(`groups/${activeGroupId}/lastActive`).set(Date.now());
+  updateGroupActivity();
 }
 
 // --- Listen Messages ---
-function listenMessages(){
+function listenMessages() {
   const chatArea = document.getElementById('chatArea');
   chatArea.innerHTML='';
-
-  let ref;
-  if(activeDMUserId){
-    const key = [userId, activeDMUserId].sort().join('_');
-    ref = db.ref(`dms/${key}`);
-  } else {
-    ref = db.ref(`groups/${activeGroupId}/messages`);
+  if(activeGroupId) {
+    const ref = db.ref(`groups/${activeGroupId}/messages`);
+    ref.off();
+    ref.on('child_added', async snap=>{
+      const msg = snap.val();
+      const div = document.createElement('div');
+      div.classList.add('message', msg.userId===userId?'outgoing':'incoming');
+      try {
+        if(msg.encryptedText){
+          const decrypted = new TextDecoder().decode(await decryptData(msg.encryptedText));
+          div.innerHTML = `<div class="message-sender"><img src="" style="width:24px;height:24px;border-radius:50%;background:${msg.avatar};margin-right:6px;display:inline-block;">${msg.username}</div>${decrypted}`;
+        } else if(msg.encryptedImage){
+          const decrypted = new Blob([await decryptData(msg.encryptedImage)]);
+          const url = URL.createObjectURL(decrypted);
+          div.innerHTML = `<div class="message-sender"><img src="" style="width:24px;height:24px;border-radius:50%;background:${msg.avatar};margin-right:6px;display:inline-block;">${msg.username}</div><img src="${url}" class="message-img">`;
+        }
+      } catch { div.innerHTML = `<div class="message-sender">${msg.username}</div>[Cannot decrypt]`; }
+      chatArea.appendChild(div);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    });
   }
-
-  ref.off();
-  ref.on('child_added', async snap => {
-    const msg = snap.val();
-    const div = document.createElement('div');
-    div.classList.add('message', msg.userId === userId ? 'outgoing' : 'incoming');
-
-    let content = `<div class="message-sender"><img src="${msg.avatar}" width="24" height="24" style="border-radius:50%;margin-right:5px;">${msg.username}</div>`;
-    try{
-      if(msg.encryptedText) content += new TextDecoder().decode(await decryptData(msg.encryptedText));
-      else if(msg.textIfDM) content += msg.textIfDM;
-      else if(msg.encryptedImage){
-        const blob = new Blob([await decryptData(msg.encryptedImage)]);
-        const url = URL.createObjectURL(blob);
-        content += `<img src="${url}" class="message-img">`;
-      } else if(msg.imageIfDM){
-        content += `<img src="${msg.imageIfDM}" class="message-img">`;
-      }
-    } catch { content += '[Cannot decrypt]'; }
-
-    div.innerHTML = content;
-    chatArea.appendChild(div);
-    chatArea.scrollTop = chatArea.scrollHeight;
-  });
 }
 
 // --- Participants Panel ---
-function updateParticipants(){
-  const panel = document.getElementById('participantsPanel');
-  panel.innerHTML = `<h3>Participants</h3>`;
+function listenParticipants(){
+  const panel = document.getElementById('participantsList');
+  panel.innerHTML='';
   if(!activeGroupId) return;
-  db.ref(`groups/${activeGroupId}/users`).once('value', snap=>{
-    snap.forEach(child=>{
-      const u = child.val();
-      const item = document.createElement('div');
-      item.className = 'participant-item';
-      item.innerHTML = `<img src="${u.avatar}" width="24" height="24" style="border-radius:50%;margin-right:5px;">${u.username}`;
-      item.onclick = ()=>{
-        activeDMUserId = child.key;
-        document.getElementById('chatHeader').textContent = `DM: ${u.username}`;
-        listenMessages();
-      }
-      panel.appendChild(item);
+  const ref = db.ref(`groups/${activeGroupId}/users`);
+  ref.off();
+  ref.on('value', snap=>{
+    panel.innerHTML='';
+    snap.forEach(u=>{
+      const data = u.val();
+      const div = document.createElement('div');
+      div.className = 'participant-item';
+      div.innerHTML = `<img src="" style="width:24px;height:24px;border-radius:50%;background:${data.avatar};margin-right:6px;display:inline-block;">${data.username}`;
+      div.onclick = () => { startDM(u.key); }
+      panel.appendChild(div);
     });
   });
 }
 
-// --- Toggle participants ---
-document.getElementById('chatHeader').addEventListener('click', ()=>{
-  const panel = document.getElementById('participantsPanel');
-  panel.style.display = panel.style.display==='flex'?'none':'flex';
-});
+// --- DM Functions ---
+async function startDM(targetId){
+  activeDMUser = targetId;
+  activeGroupId = null;
+  document.getElementById('chatHeader').textContent = 'DM: '+targetId;
+  listenDMMessages();
+}
 
-// --- Click outside to hide ---
-document.addEventListener('click', e=>{
-  const panel = document.getElementById('participantsPanel');
-  if(!panel.contains(e.target) && !document.getElementById('chatHeader').contains(e.target)){
-    panel.style.display='none';
-  }
-});
+async function sendDM(){
+  const text = document.getElementById('messageText').value.trim();
+  if(!text || !activeDMUser) return;
+  const encryptedObj = await encryptData(new TextEncoder().encode(text));
+  const ref = db.ref(`dms/${[userId,activeDMUser].sort().join('_')}`).push();
+  ref.set({userId, username, avatar, encryptedText: encryptedObj, timestamp: Date.now()});
+  setTimeout(()=>ref.remove(), 24*60*60*1000);
+  document.getElementById('messageText').value='';
+}
 
-// --- Auto delete inactive groups ---
-setInterval(()=>{
-  db.ref('groups').once('value', snap=>{
-    snap.forEach(g=>{
-      const lastActive = g.val().lastActive || 0;
-      if(Date.now() - lastActive > 24*60*60*1000){
-        db.ref(`groups/${g.key}`).remove();
+async function sendDMImage(event){
+  if(!activeDMUser) return;
+  const file = event.target.files[0]; if(!file) return;
+  const arrayBuffer = await file.arrayBuffer();
+  const encryptedObj = await encryptData(arrayBuffer);
+  const ref = db.ref(`dms/${[userId,activeDMUser].sort().join('_')}`).push();
+  ref.set({userId, username, avatar, encryptedImage: encryptedObj, timestamp: Date.now()});
+  setTimeout(()=>ref.remove(), 60*1000);
+  event.target.value='';
+}
+
+function listenDMMessages(){
+  if(!activeDMUser) return;
+  const chatArea = document.getElementById('chatArea');
+  chatArea.innerHTML='';
+  const ref = db.ref(`dms/${[userId,activeDMUser].sort().join('_')}`);
+  ref.off();
+  ref.on('child_added', async snap=>{
+    const msg = snap.val();
+    const div = document.createElement('div');
+    div.classList.add('message', msg.userId===userId?'outgoing':'incoming');
+    try {
+      if(msg.encryptedText){
+        const decrypted = new TextDecoder().decode(await decryptData(msg.encryptedText));
+        div.innerHTML = `<div class="message-sender"><img src="" style="width:24px;height:24px;border-radius:50%;background:${msg.avatar};margin-right:6px;display:inline-block;">${msg.username}</div>${decrypted}`;
+      } else if(msg.encryptedImage){
+        const decrypted = new Blob([await decryptData(msg.encryptedImage)]);
+        const url = URL.createObjectURL(decrypted);
+        div.innerHTML = `<div class="message-sender"><img src="" style="width:24px;height:24px;border-radius:50%;background:${msg.avatar};margin-right:6px;display:inline-block;">${msg.username}</div><img src="${url}" class="message-img">`;
       }
-    });
+    } catch { div.innerHTML = `<div class="message-sender">${msg.username}</div>[Cannot decrypt]`; }
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
   });
-}, 60*60*1000);
+    }
