@@ -4,70 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Anonymous Group Chat</title>
+    <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-            color: #333;
-            min-height: 100vh;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .container {
-            max-width: 1200px;
-            width: 100%;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-            margin: 20px 0;
-            display: flex;
-            flex-direction: column;
-            height: 90vh;
-        }
-        
-        header {
-            background: linear-gradient(135deg, #4a6cf7 0%, #82a0ff 100%);
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }
-        
-        h1 {
-            font-size: 2.2rem;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-        
-        .subtitle {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            font-weight: 400;
-        }
-        
-        .chat-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-        
-        .sidebar {
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-comments"></i> SecureGroup Chat</h1>
+            <p class="subtitle">Real-time encrypted anonymous group messaging</p>
+        </header>
+
+        <div class="chat-container">
+            <div class="sidebar">
+                <div class="section">
+                    <h2><i class="fas fa-users"></i> Group Info</h2>
+                    <div class="input-group">
+                        <label for="groupId">Group ID</label>
+                        <input type="text" id="groupId" placeholder="Enter group ID">
+                    </div>
+                    <div class="input-group">
+                        <label for="password">Group Password</label>
+                        <div class="password-container">
+                            <input type="password" id="password" placeholder="Enter group password">
+                            <span class="toggle-password" onclick="togglePasswordVisibility('password')">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="joinGroup()">
+                        <i class="fas fa-sign-in-alt"></i> Join Group
+                    </button>
+                    <button class="btn btn-secondary" onclick="createGroup()">
+                        <i class="fas fa-plus"></i> Create New Group
+                    </button>
+                </div>
+
+                <div class="user-list section">
+                    <h2><i class="fas fa-user-friends"></i> Online Users</h2>
+                    <div id="users">
+                        <p class="help-text">No users online. Join a group to start chatting.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div class="login-section" id="loginSection">
+                    <h2>Join a group to start chatting</h2>
+                    <p>Enter a group ID and password above to join an existing group or create a new one.</p>
+                </div>
+
+                <div class="chat-area hidden" id="chatArea"></div>
+
+                <div class="typing-indicator" id="typingIndicator"></div>
+
+                <div class="message-input hidden" id="messageInput">
+                    <input type="text" id="messageText" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+                    <label for="imageUpload" class="upload-btn"><i class="fas fa-image"></i></label>
+                    <input type="file" id="imageUpload" accept="image/*">
+                    <button class="btn btn-small" onclick="sendMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>        .sidebar {
             width: 300px;
             background: #f9fafc;
             padding: 20px;
