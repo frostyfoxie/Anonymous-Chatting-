@@ -208,6 +208,24 @@ async function sendMessage() {
     input.value = '';
 }
 
+function addMessage(sender, content, isSystem = false) {
+    const chatArea = document.getElementById('chatArea');
+    const div = document.createElement('div');
+
+    if (isSystem) {
+        div.className = 'message message-incoming';
+        div.innerHTML = `<div class="message-sender">${sender}</div>
+                         <div class="message-content"><i>${content}</i></div>`;
+    } else {
+        div.className = 'message message-outgoing';
+        div.innerHTML = `<div class="message-sender">${sender}</div>
+                         <div class="message-content">${content}</div>`;
+    }
+
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+}
+
 function receiveMessage({ sender, content, type }) {
     const chatArea = document.getElementById('chatArea');
     const div = document.createElement('div');
