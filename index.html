@@ -1,49 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Multi-Group Chat</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure Encrypted Chat</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  * {margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}
+  body {background: #f0f4f8; display:flex; justify-content:center; align-items:center; height:100vh;}
+  .container {display:flex; width:90%; height:90vh; background:white; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.1); overflow:hidden;}
+  .sidebar {width:280px; background:#4f46e5; color:white; display:flex; flex-direction:column; padding:20px;}
+  .sidebar h2 {margin-bottom:15px; font-size:1.3rem;}
+  .group-list {flex:1; overflow-y:auto;}
+  .group-item {padding:10px; border-radius:8px; margin-bottom:8px; cursor:pointer; background:rgba(255,255,255,0.1);}
+  .group-item:hover, .group-item.active {background:rgba(255,255,255,0.3);}
+  .join-group {margin-top:15px; display:flex; flex-direction:column; gap:8px;}
+  .join-group input {padding:10px; border:none; border-radius:8px;}
+  .btn {padding:10px; border:none; border-radius:8px; cursor:pointer; font-weight:600;}
+  .btn-primary {background:#2563eb; color:white;}
+  .btn-secondary {background:#6b7280; color:white;}
+  .main {flex:1; display:flex; flex-direction:column;}
+  .chat-header {padding:15px; background:#6366f1; color:white; font-size:1.2rem;}
+  .chat-area {flex:1; padding:15px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; background:#f9fafc;}
+  .message {padding:12px 16px; border-radius:18px; max-width:70%; word-break:break-word; position:relative; animation:fadeIn 0.3s ease;}
+  .incoming {background:#e0e7ff; align-self:flex-start;}
+  .outgoing {background:linear-gradient(135deg,#4f46e5,#6366f1); color:white; align-self:flex-end;}
+  .message-sender {font-weight:600; font-size:0.85rem; margin-bottom:4px;}
+  .message-input {display:flex; padding:15px; gap:10px; border-top:1px solid #e4e8f0;}
+  .message-input input {flex:1; padding:10px; border-radius:12px; border:1px solid #ddd;}
+  @keyframes fadeIn {from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);}}
+</style>
 </head>
 <body>
-    <div class="container">
-        <aside class="sidebar">
-            <h2 class="sidebar-title"><i class="fas fa-users"></i> Your Groups</h2>
-            <div id="groupList" class="group-list">
-                <p class="empty-text">No groups joined yet</p>
-            </div>
-            <div class="join-group-section">
-                <input type="text" id="groupId" placeholder="Group ID" class="input-field">
-                <input type="password" id="password" placeholder="Group Password" class="input-field">
-                <button class="btn btn-primary" onclick="joinGroup()"><i class="fas fa-sign-in-alt"></i> Join</button>
-                <button class="btn btn-secondary" onclick="createGroup()"><i class="fas fa-plus"></i> Create</button>
-            </div>
-        </aside>
 
-        <main class="main-chat">
-            <header class="chat-header">
-                <h1 id="activeGroupTitle">Select a group</h1>
-            </header>
-            <div id="chatArea" class="chat-area">
-                <!-- Messages go here -->
-            </div>
-            <div id="typingIndicator" class="typing-indicator"></div>
-            <div class="message-input">
-                <input type="text" id="messageText" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
-                <label for="imageUpload" class="upload-btn"><i class="fas fa-image"></i></label>
-                <input type="file" id="imageUpload" accept="image/*">
-                <button class="btn btn-send" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
-            </div>
-        </main>
+<div class="container">
+  <div class="sidebar">
+    <h2><i class="fas fa-users"></i> Groups</h2>
+    <div id="groupList" class="group-list">
+      <p class="empty-text">No groups joined yet</p>
     </div>
+    <div class="join-group">
+      <input type="text" id="groupId" placeholder="Group ID">
+      <input type="password" id="groupPassword" placeholder="Password">
+      <button class="btn btn-primary" onclick="joinGroup()">Join Group</button>
+      <button class="btn btn-secondary" onclick="createGroup()">Create Group</button>
+    </div>
+  </div>
 
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <div class="main">
+    <div id="chatHeader" class="chat-header">Select a group</div>
+    <div id="chatArea" class="chat-area"></div>
+    <div class="message-input">
+      <input type="text" id="messageText" placeholder="Type a message..." onkeypress="if(event.key==='Enter'){sendMessage()}">
+      <button class="btn btn-primary" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+</div>
 
-    <script src="script.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
+  authDomain: "anonymous-chatting-c6712.firebaseapp.com",
+  databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "anonymous-chatting-c6712",
+  storageBucket: "anonymous-chatting-c6712.appspot.com",
+  messagingSenderId: "124331866043",
+  appId: "1:124331866043:web:8be37be9d84974b4a0b69e"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let userId = localStorage.getItem('userId') || (localStorage.setItem('userId', Math.random().toString(36).substring(2)), localStorage.getItem('userId'));
+let username = `Anon${Math.floor(Math.random()*10000)}`;
+let groups = {};
+let activeGroupId = null;
+let encryptionKey = null;
+
+async function deriveKey(password, salt) {
+  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
+  return await crypto.subtle.deriveKey({name:'PBKDF2', salt:new TextEncoder().encode(salt), iterations:100000, hash:'SHA-256'}, keyMaterial, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+
+async function encryptText(text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({name:'AES-GCM', iv}, encryptionKey, new TextEncoder().encode(text));
+  return JSON.stringify({iv:Array.from(iv), data:Array.from(new Uint8Array(encrypted))});
+}
+
+async function decryptText(payload) {
+  const obj = JSON.parse(payload);
+  const iv = new Uint8Array(obj.iv);
+  const data = new Uint8Array(obj.data);
+  const decrypted = await crypto.subtle.decrypt({name:'AES-GCM', iv}, encryptionKey, data);
+  return new TextDecoder().decode(decrypted);
+}
+
+function createGroup() {
+  const id = Math.random().toString(36).substring(2,8).toUpperCase();
+  const pwd = Math.random().toString(36).substring(2,10);
+  document.getElementById('groupId').value = id;
+  document.getElementById('groupPassword').value = pwd;
+  alert(`Group Created!\nID: ${id}\nPassword: ${pwd}`);
+}
+
+async function joinGroup() {
+  const groupId = document.getElementById('groupId').value.trim();
+  const password = document.getElementById('groupPassword').value;
+  if(!groupId || !password){alert('Enter both Group ID and Password'); return;}
+  
+  encryptionKey = await deriveKey(password, groupId);
+  activeGroupId = groupId;
+  if(!groups[groupId]) groups[groupId] = true;
+  renderGroupList();
+  document.getElementById('chatHeader').innerText = `Group: ${groupId}`;
+  listenMessages();
+}
+
+function renderGroupList(){
+  const list = document.getElementById('groupList');
+  list.innerHTML = '';
+  Object.keys(groups).forEach(g=>{
+    const div = document.createElement('div');
+    div.classList.add('group-item');
+    if(g===activeGroupId) div.classList.add('active');
+    div.innerText = g;
+    div.onclick = ()=>{activeGroupId=g; document.getElementById('chatHeader').innerText=`Group: ${g}`; listenMessages();}
+    list.appendChild(div);
+  });
+}
+
+async function sendMessage(){
+  const msgInput = document.getElementById('messageText');
+  const text = msgInput.value.trim();
+  if(!text || !activeGroupId) return;
+  const encrypted = await encryptText(text);
+  db.ref(`groups/${activeGroupId}/messages`).push({userId, username, encryptedText:encrypted, timestamp:Date.now()});
+  msgInput.value='';
+}
+
+function listenMessages(){
+  if(!activeGroupId) return;
+  const chatArea = document.getElementById('chatArea');
+  chatArea.innerHTML='';
+  const ref = db.ref(`groups/${activeGroupId}/messages`);
+  ref.off(); // remove previous listeners
+  ref.on('child_added', async snapshot=>{
+    const msg = snapshot.val();
+    let content;
+    try{content = await decryptText(msg.encryptedText);}catch{content='[Cannot decrypt]';}
+    const div = document.createElement('div');
+    div.classList.add('message');
+    div.classList.add(msg.userId===userId?'outgoing':'incoming');
+    div.innerHTML = `<div class="message-sender">${msg.username}</div>${content}`;
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  });
+}
+</script>
+
 </body>
-</html>
+    </html>
