@@ -3,51 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Epic Secure Chat</title>
-<link rel="stylesheet" href="style.css">
+<title>Secure Ephemeral Chat</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container">
+
   <!-- Sidebar -->
   <div class="sidebar">
-    <h2><i class="fas fa-users"></i> Groups</h2>
+    <div class="sidebar-header">
+      <h2><i class="fas fa-users"></i> Groups</h2>
+    </div>
     <div class="group-list" id="groupList"></div>
     <div class="join-group">
       <input type="text" id="groupIdInput" placeholder="Group ID">
       <input type="password" id="groupPasswordInput" placeholder="Group Password">
-      <button id="joinGroupBtn">Join / Create</button>
-    </div>
-    <div class="profile-section">
-      <img id="userPfp" src="default-avatar.png" alt="PFP" class="pfp">
-      <span id="usernameDisplay"></span>
+      <button id="joinGroupBtn">Join/Create</button>
     </div>
   </div>
 
-  <!-- Main chat -->
+  <!-- Main Chat Area -->
   <div class="main">
     <div class="chat-header">
-      <span id="chatTitle">Select or Join a Group</span>
+      <div id="chatTitle">Select or Join a Group</div>
       <button id="participantsBtn"><i class="fas fa-user-friends"></i></button>
     </div>
-    
+
     <div class="chat-area" id="chatArea"></div>
 
+    <!-- Participants Panel -->
+    <div class="participants-panel" id="participantsPanel">
+      <h3>Participants</h3>
+      <div id="participantsList"></div>
+    </div>
+
+    <!-- Message Input -->
     <div class="message-input">
-      <input type="text" id="messageText" placeholder="Type a message..." />
+      <input type="text" id="messageText" placeholder="Type message..." onkeypress="if(event.key==='Enter') sendMessage()">
       <label class="btn-file">
         <i class="fas fa-image"></i>
-        <input type="file" id="imageUpload" accept="image/*" />
+        <input type="file" id="imageUpload" accept="image/*" onchange="sendImage(event)">
       </label>
       <button id="sendBtn"><i class="fas fa-paper-plane"></i></button>
     </div>
   </div>
 
-  <!-- Participants / DMs panel -->
-  <div class="participants-panel" id="participantsPanel">
-    <h3>Participants</h3>
-    <div id="participantsList"></div>
-  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
