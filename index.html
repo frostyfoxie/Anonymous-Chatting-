@@ -1,115 +1,599 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Discord Lite Chat</title>
-<style>
-  body {margin:0;font-family:Arial,sans-serif;background:#2f3136;color:white;}
-  #app{display:grid;grid-template-columns:220px 1fr; height:100vh;}
-  .sidebar{background:#202225;padding:10px;display:flex;flex-direction:column;align-items:center;}
-  .sidebar input{margin:5px 0;padding:5px;border-radius:5px;border:none;width:90%;}
-  #pfpPreview{width:70px;height:70px;border-radius:50%;margin-bottom:5px;}
-  #chatWindow{background:#36393f;display:flex;flex-direction:column;}
-  #messages{flex:1;padding:10px;overflow-y:auto;}
-  .message{display:flex;margin-bottom:10px;}
-  .message .pfp{border-radius:50%;margin-right:10px;width:40px;height:40px;}
-  .message .content{flex:1;}
-  .username{font-weight:bold;margin-right:5px;}
-  .timestamp{font-size:12px;color:gray;}
-  .text{margin-top:3px;}
-  #inputBar{display:flex;padding:10px;border-top:1px solid #2f3136;}
-  #msgInput{flex:1;padding:8px;border-radius:5px;border:none;}
-  #sendBtn{margin-left:10px;padding:8px 12px;background:#5865f2;border:none;border-radius:5px;color:white;cursor:pointer;}
-  #sendBtn:hover{background:#4752c4;}
-  .deleteBtn{background:red;color:white;border:none;border-radius:3px;padding:2px 5px;margin-left:5px;cursor:pointer;font-size:10px;}
-  .image-preview{max-width:150px;border-radius:5px;margin-top:5px;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Anonymous Group Chat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #4a6cf7 0%, #82a0ff 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        
+        .chat-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #f9fafc;
+            padding: 20px;
+            border-right: 1px solid #e4e8f0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .login-section {
+            padding: 25px;
+            background: #f9fafc;
+            border-bottom: 1px solid #e4e8f0;
+        }
+        
+        .chat-area {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .message-input {
+            padding: 20px;
+            background: #f9fafc;
+            border-top: 1px solid #e4e8f0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            color: #4a6cf7;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        textarea, input, select {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        textarea:focus, input:focus, select:focus {
+            outline: none;
+            border-color: #4a6cf7;
+            box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.1);
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4a6cf7 0%, #82a0ff 100%);
+            color: white;
+            border: none;
+            padding: 14px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(74, 108, 247, 0.2);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #a0aec0 100%);
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.2);
+        }
+        
+        .btn-small {
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        
+        .user-list {
+            margin-top: 20px;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+        
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4a6cf7 0%, #82a0ff 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+        
+        .message {
+            max-width: 70%;
+            padding: 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message-incoming {
+            background: #f0f4ff;
+            border-top-left-radius: 4px;
+            align-self: flex-start;
+        }
+        
+        .message-outgoing {
+            background: linear-gradient(135deg, #4a6cf7 0%, #82a0ff 100%);
+            color: white;
+            border-top-right-radius: 4px;
+            align-self: flex-end;
+        }
+        
+        .message-sender {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            opacity: 0.7;
+            text-align: right;
+            margin-top: 5px;
+        }
+        
+        .message-content {
+            word-break: break-word;
+        }
+        
+        .message-img {
+            max-width: 100%;
+            border-radius: 12px;
+            margin-top: 5px;
+            max-height: 200px;
+            object-fit: cover;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .online-indicator {
+            width: 10px;
+            height: 10px;
+            background: #4ade80;
+            border-radius: 50%;
+            margin-left: auto;
+        }
+        
+        .flex-group {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .flex-group > * {
+            flex: 1;
+        }
+        
+        .password-container {
+            position: relative;
+        }
+        
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #7d7d7d;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #6c757d 0%, #a0aec0 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #imageUpload {
+            display: none;
+        }
+        
+        .typing-indicator {
+            font-style: italic;
+            color: #666;
+            margin: 5px 0;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .chat-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                border-right: none;
+                border-bottom: 1px solid #e4e8f0;
+            }
+            
+            .flex-group {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .message {
+                max-width: 85%;
+            }
+        }
+    </style>
 </head>
 <body>
-
-<div id="app">
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <img id="pfpPreview" src="https://i.pravatar.cc/70" alt="PFP">
-    <input type="text" id="nickname" placeholder="Enter nickname">
-    <input type="file" id="pfpUpload">
-  </div>
-
-  <!-- Chat Window -->
-  <div id="chatWindow">
-    <div id="messages"></div>
-    <div id="inputBar">
-      <input type="text" id="msgInput" placeholder="Type a message...">
-      <input type="file" id="imageInput">
-      <button id="sendBtn">Send</button>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-comments"></i> SecureGroup Chat</h1>
+            <p class="subtitle">Real-time encrypted anonymous group messaging</p>
+        </header>
+        
+        <div class="chat-container">
+            <div class="sidebar">
+                <div class="section">
+                    <h2><i class="fas fa-users"></i> Group Info</h2>
+                    <div class="input-group">
+                        <label for="groupId">Group ID</label>
+                        <input type="text" id="groupId" placeholder="Enter group ID">
+                    </div>
+                    <div class="input-group">
+                        <label for="password">Group Password</label>
+                        <div class="password-container">
+                            <input type="password" id="password" placeholder="Enter group password">
+                            <span class="toggle-password" onclick="togglePasswordVisibility('password')">
+                                <i class="fas fa-eye"></i>
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="joinGroup()">
+                        <i class="fas fa-sign-in-alt"></i> Join Group
+                    </button>
+                    <button class="btn btn-secondary" onclick="createGroup()" style="margin-top: 10px;">
+                        <i class="fas fa-plus"></i> Create New Group
+                    </button>
+                </div>
+                
+                <div class="user-list section">
+                    <h2><i class="fas fa-user-friends"></i> Online Users</h2>
+                    <div id="users">
+                        <p class="help-text">No users online. Join a group to start chatting.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <div class="login-section" id="loginSection">
+                    <h2>Join a group to start chatting</h2>
+                    <p>Enter a group ID and password above to join an existing group or create a new one.</p>
+                </div>
+                
+                <div class="chat-area hidden" id="chatArea">
+                    <!-- Messages will appear here -->
+                </div>
+                
+                <div class="typing-indicator" id="typingIndicator"></div>
+                
+                <div class="message-input hidden" id="messageInput">
+                    <input type="text" id="messageText" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+                    <label for="imageUpload" class="upload-btn">
+                        <i class="fas fa-image"></i>
+                    </label>
+                    <input type="file" id="imageUpload" accept="image/*">
+                    <button class="btn btn-small" onclick="sendMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-</div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getDatabase, ref, push, set, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
-  import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-storage.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
-    authDomain: "anonymous-chatting-c6712.firebaseapp.com",
-    databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "anonymous-chatting-c6712",
-    storageBucket: "anonymous-chatting-c6712.firebasestorage.app",
-    messagingSenderId: "124331866043",
-    appId: "1:124331866043:web:8be37be9d84974b4a0b69e"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-  const storage = getStorage(app);
-
-  let currentUID = Math.random().toString(36).substring(2,10);
-  let currentPFP = "https://i.pravatar.cc/70";
-
-  // PFP Upload
-  document.getElementById("pfpUpload").addEventListener("change", e=>{
-    const file = e.target.files[0];
-    if(!file) return;
-    const storageRef = sRef(storage,"pfps/"+currentUID);
-    uploadBytes(storageRef,file).then(()=>getDownloadURL(storageRef)).then(url=>{
-      currentPFP = url;
-      document.getElementById("pfpPreview").src = url;
-    });
-  });
-
-  const messagesRef = ref(db,"messages");
-
-  // Send Message
-  document.getElementById("sendBtn").addEventListener("click", async()=>{
-    const text = document.getElementById("msgInput").value.trim();
-    const nickname = document.getElementById("nickname").value.trim()||"Anon";
-    const imgFile = document.getElementById("imageInput").files[0];
-
-    if(!text && !imgFile) return;
-
-    if(imgFile){
-      const imgRef = sRef(storage,"images/"+Date.now()+"_"+imgFile.name);
-      await uploadBytes(imgRef,imgFile);
-      const imgURL = await getDownloadURL(imgRef);
-      push(messagesRef,{
-        uid: currentUID,
-        nickname,
-        pfp: currentPFP,
-        text: text,
-        image: imgURL,
-        timestamp: Date.now()
-      });
-    } else {
-      push(messagesRef,{
-        uid: currentUID,
-        nickname,
-        pfp: currentPFP,
-        text,
-        image: null,
-        timestamp: Date.now()
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
+            authDomain: "anonymous-chatting-c6712.firebaseapp.com",
+            databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "anonymous-chatting-c6712",
+            storageBucket: "anonymous-chatting-c6712.firebasestorage.app",
+            messagingSenderId: "124331866043",
+            appId: "1:124331866043:web:8be37be9d84974b4a0b69e",
+            measurementId: "G-WVDHPRB41K"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const storage = firebase.storage();
+        
+        // State variables
+        let currentGroup = null;
+        let currentUser = null;
+        let encryptionKey = null;
+        let userId = null;
+        let isTyping = false;
+        let typingTimer = null;
+        
+        // Generate random meaningful usernames
+        const adjectives = ['Mysterious', 'Anonymous', 'Secret', 'Hidden', 'Stealthy', 'Private', 'Unknown', 'Incognito', 'Covert', 'Discreet'];
+        const nouns = ['Phoenix', 'Panther', 'Fox', 'Falcon', 'Wolf', 'Eagle', 'Lion', 'Tiger', 'Hawk', 'Owl'];
+        
+        // Generate a random user name
+        function generateUsername() {
+            const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+            const noun = nouns[Math.floor(Math.random() * nouns.length)];
+            return `${adj}${noun}${Math.floor(Math.random() * 1000)}`;
+        }
+        
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = input.nextElementSibling.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        // Create a new group
+        function createGroup() {
+            const groupId = Math.random().toString(36).substring(2, 10).toUpperCase();
+            const password = Math.random().toString(36).substring(2, 15);
+            
+            document.getElementById('groupId').value = groupId;
+            document.getElementById('password').value = password;
+            
+            alert(`New group created!\nGroup ID: ${groupId}\nPassword: ${password}\n\nShare these with others to let them join your group.`);
+        }
+        
+        // Join a group
+        async function joinGroup() {
+            const groupId = document.getElementById('groupId').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!groupId || !password) {
+                alert('Please enter both Group ID and Password');
+                return;
+            }
+            
+            try {
+                // Generate a user ID if not exists
+                if (!userId) {
+                    userId = localStorage.getItem('userId');
+                    if (!userId) {
+                        userId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+                        localStorage.setItem('userId', userId);
+                    }
+                }
+                
+                // Generate a user name
+                currentUser = generateUsername();
+                
+                // Derive encryption key from password
+                const salt = new TextEncoder().encode(groupId); // Use groupId as salt
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    new TextEncoder().encode(password),
+                    { name: 'PBKDF2' },
+                    false,
+                    ['deriveKey']
+                );
+                
+                encryptionKey = await crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+                
+                currentGroup = groupId;
+                
+                // Initialize user in Firebase
+                await db.ref(`groups/${groupId}/users/${userId}`).set({
+                    username: currentUser,
+                    joined: Date.now(),
+                    lastSeen: Date.now()
+                });
+                
+                // Set up real-time listeners
+                setupFirebaseListeners();
+                
+                // Update UI
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('chatArea').classList.remove('hidden');
+                document.getElementById('messageInput').classList.remove('hidden');
+                
+                // Add welcome message
+                addMessage('System', `Welcome to group ${groupId}! You are known as ${currentUser}.`, true);
+                
+            } catch (error) {
+                console.error('Error joining group:', error);
+                alert('Failed to join group: ' + error.message);
+            }
+        }
+        
+        // Set up Firebase real-time listeners
+        function setupFirebaseListeners() {
+            // Listen for new messages
+            db.ref(`groups/${currentGroup}/messages`).on('child_added', async (snapshot) => {
+                const message = snapshot.val();
+                if (message.userId === userId) return; // Don't show our own messages twice
+                
+                try {
+                    let decryptedContent = '';
+                    let messageType = 'text';
+                    
+                    if (message.encryptedText) {
+                        decryptedContent = await decryptText(message.encryptedText, encryptionKey);
+                    } else if (message.encryptedImage) {
+                        decryptedContent = await decryptText(message.encryptedImage, encryptionKey);
+                        messageType = 'image';
+                    }
+                    
+                    // Get sender info
+                    const senderSnapshot = await db.ref(`groups/${currentGroup}/users/${message.userId}`).once('value');
+                    const sender = senderSnapshot.val();
+                    
+                    receiveMessage({
+                        sender: sender.username,
+                        content: decryptedContent,
+                        timestamp: message.timestamp,
+                        type: messageType
+                    });
+                } catch (error) {
+                    console.error('Error decrypting message:', error);
+                }
+            });
+            
+            // Listen for user updates
+            db.ref(`groups/${currentGroup}/users`).on('value', (snapshot) => {
+                const users = snapshot.val();
+                updateUserList(users);
+            });
+            
+            // Listen for typing indicators
+            db.ref(`groups/${currentGroup}/typing`).on('value', (snapshot) => {
+                const typingUsers = snapshot.val() || {};
+                updateTypingIndicator(typingUsers);
+            });
+            
+            // Update last seen periodically
+            setInterval(() => {
+                if (currentGro        timestamp: Date.now()
       });
     }
 
