@@ -574,7 +574,7 @@ body {
   <div id="sidebar">
     <div class="sidebar-header">
       <button id="groupTab" class="active" onclick="showGroups()">Groups</button>
-      <!--<button id="dmTab" onclick="showDMs()">DMs</button>-->
+      <button id="dmTab" onclick="showDMs()">DMs</button>
     </div>
 
     <!-- Groups -->
@@ -585,13 +585,13 @@ body {
       <button onclick="joinGroup()">Join/Create</button>
     </div>
 
-    <!-- DMs
+    <!-- DMs-->
     <div id="dmList" class="group-list hidden"></div>
     <div class="new-dm hidden">
       <input type="text" id="dmUserInput" placeholder="User ID">
-      <button onclick="startDM()">Start DM</button>
+      <button onclick="startDM()" disabled>Not available</button>
     </div>
-  </div>-->
+  </div>
 
   <!-- Main Chat Area -->
   <div id="chatContainer">
