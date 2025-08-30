@@ -3,248 +3,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ultimate Secure Ephemeral Chat</title>
+<title>Ultimate Secure Chat</title>
+<link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}
-html,body{width:100%;height:100%;overflow:hidden;}
-.container{display:flex;width:100%;height:100%;}
-.sidebar{width:280px;background:#4f46e5;color:white;display:flex;flex-direction:column;padding:20px;position:relative;}
-.sidebar h2{margin-bottom:10px;font-size:1.3rem;display:flex;align-items:center;justify-content:space-between;}
-.group-list,.participants-list{flex:1;overflow-y:auto;margin-bottom:10px;}
-.group-item,.participant-item{background: rgba(255,255,255,0.1); border-radius:12px;padding:10px;margin-bottom:6px;cursor:pointer;transition:0.3s;display:flex;align-items:center;gap:8px;}
-.group-item:hover,.group-item.active,.participant-item:hover,.participant-item.active{background: rgba(255,255,255,0.25);box-shadow:0 4px 12px rgba(0,0,0,0.2);}
-.join-group{display:flex;flex-direction:column;gap:6px;margin-top:5px;}
-.join-group input{padding:8px;border:none;border-radius:6px;}
-.join-group button{padding:8px;border:none;border-radius:6px;background:#2563eb;color:white;cursor:pointer;font-weight:600;}
-.main{flex:1;display:flex;flex-direction:column;height:100%;}
-.chat-header{padding:12px;background:#6366f1;color:white;font-size:1.1rem;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
-.chat-area{flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#f9fafc;}
-.message{padding:10px 14px;border-radius:22px;max-width:70%;word-break:break-word;position:relative;animation:fadeIn 0.3s;box-shadow:0 3px 8px rgba(0,0,0,0.1);}
-.incoming{background:#e0e7ff;align-self:flex-start;}
-.outgoing{background:#4f46e5;color:white;align-self:flex-end;box-shadow:0 4px 10px rgba(0,0,0,0.15);}
-.message-sender{font-weight:600;font-size:0.8rem;margin-bottom:2px;display:flex;align-items:center;gap:6px;}
-.message-img{max-width:180px;border-radius:14px;margin-top:4px;box-shadow:0 2px 8px rgba(0,0,0,0.15);}
-.message-input{display:flex;padding:12px;gap:8px;border-top:1px solid #ddd;background:white;}
-.message-input input[type=text]{flex:1;padding:8px;border-radius:10px;border:1px solid #ddd;}
-.message-input input[type=file]{display:none;}
-.btn-file{padding:8px;border-radius:6px;background:#6b7280;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-#participantsToggle{cursor:pointer;}
-.participants-list-container{position:absolute;top:40px;right:0;width:200px;background:white;color:black;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.25);overflow:hidden;display:none;flex-direction:column;z-index:10;}
-.participant-item img{width:24px;height:24px;border-radius:50%;}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
-</style>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
 <div class="container">
-  <div class="sidebar">
-    <h2><i class="fas fa-users"></i> Groups</h2>
-    <div class="group-list" id="groupList"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <header class="sidebar-header">
+      <h2><i class="fas fa-users"></i> Groups</h2>
+    </header>
+    <div class="group-list" id="groupList">
+      <!-- Groups will be dynamically added here -->
+    </div>
     <div class="join-group">
       <input type="text" id="groupIdInput" placeholder="Group ID">
       <input type="password" id="groupPasswordInput" placeholder="Group Password">
-      <button onclick="joinGroup()">Join/Create</button>
+      <button id="joinGroupBtn">Join/Create</button>
     </div>
-    <div style="margin-top:10px;">
-      <label style="cursor:pointer;"><i class="fas fa-user-circle"></i> PFP
-      <input type="file" id="pfpUpload" accept="image/*" onchange="setPfp(event)" style="display:none;"></label>
+  </aside>
+
+  <!-- Main Chat Area -->
+  <main class="main">
+    <header class="chat-header">
+      <div class="chat-title" id="chatHeader">Select or Join a Group</div>
+      <button class="participants-btn" id="toggleParticipants">
+        <i class="fas fa-user-friends"></i> Participants
+      </button>
+    </header>
+
+    <div class="chat-area" id="chatArea">
+      <!-- Messages appear here -->
     </div>
-  </div>
-  <div class="main">
-    <div class="chat-header" id="chatHeader">
-      <span id="chatTitle">Select or Join a Group</span>
-      <i class="fas fa-user-friends" id="participantsToggle"></i>
-    </div>
-    <div class="chat-area" id="chatArea"></div>
+
     <div class="message-input">
-      <input type="text" id="messageText" placeholder="Type message..." onkeypress="if(event.key==='Enter') sendMessage()">
+      <input type="text" id="messageText" placeholder="Type a message..." autocomplete="off">
       <label class="btn-file">
         <i class="fas fa-image"></i>
-        <input type="file" id="imageUpload" accept="image/*" onchange="sendImage(event)">
+        <input type="file" id="imageUpload" accept="image/*">
       </label>
-      <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+      <button id="sendMsgBtn"><i class="fas fa-paper-plane"></i></button>
     </div>
-  </div>
-  <div class="participants-list-container" id="participantsList"></div>
+  </main>
+
+  <!-- Participants List / DM Area -->
+  <aside class="participants-panel" id="participantsPanel">
+    <header>
+      <h3>Participants</h3>
+      <button id="closeParticipants"><i class="fas fa-times"></i></button>
+    </header>
+    <ul id="participantsList">
+      <!-- Participant items added dynamically -->
+    </ul>
+  </aside>
+
 </div>
 
-<script>
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
-  authDomain: "anonymous-chatting-c6712.firebaseapp.com",
-  databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "anonymous-chatting-c6712",
-  storageBucket: "anonymous-chatting-c6712.appspot.com",
-  messagingSenderId: "124331866043",
-  appId: "1:124331866043:web:8be37be9d84974b4a0b69e"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
-// Username and PFP
-const adjectives = ['Mysterious','Anonymous','Secret','Hidden','Stealthy','Private','Unknown','Incognito','Covert','Discreet'];
-const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
-function generateUsername(){return adjectives[Math.floor(Math.random()*adjectives.length)]+nouns[Math.floor(Math.random()*nouns.length)]+Math.floor(Math.random()*1000);}
-let username = localStorage.getItem('username') || generateUsername();
-localStorage.setItem('username', username);
-let pfp = localStorage.getItem('pfp') || null;
-
-// State
-let userId = localStorage.getItem('userId') || (Math.random().toString(36).substring(2)+Date.now().toString(36));
-localStorage.setItem('userId',userId);
-let activeGroupId = localStorage.getItem('activeGroupId') || null;
-let activeDmId = null;
-let encryptionKey = null;
-let groupPasswords = JSON.parse(sessionStorage.getItem('groupPasswords')||'{}');
-
-// Derive AES-GCM key
-async function deriveKey(password,saltStr){
-  const salt=new TextEncoder().encode(saltStr);
-  const keyMaterial=await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
-  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
-}
-async function encryptData(data){const iv=crypto.getRandomValues(new Uint8Array(12));const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},encryptionKey,data);return {iv:Array.from(iv),data:btoa(String.fromCharCode(...new Uint8Array(encrypted)))};}
-async function decryptData(obj){return await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(obj.iv)},encryptionKey,Uint8Array.from(atob(obj.data),c=>c.charCodeAt(0)));}
-
-// Set PFP
-function setPfp(event){
-  const file = event.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = e=>{pfp=e.target.result;localStorage.setItem('pfp',pfp);}
-  reader.readAsDataURL(file);
-}
-
-// Update activity
-function updateGroupActivity(){if(activeGroupId) db.ref(`groups/${activeGroupId}/lastActive`).set(Date.now());}
-
-// Join group
-async function joinGroup(){
-  const gid=document.getElementById('groupIdInput').value.trim();
-  const pwd=document.getElementById('groupPasswordInput').value;
-  if(!gid||!pwd)return alert('Enter Group ID and Password');
-  activeGroupId=gid;
-  localStorage.setItem('activeGroupId',activeGroupId);
-  encryptionKey=await deriveKey(pwd,gid);
-  groupPasswords[gid]=pwd;
-  sessionStorage.setItem('groupPasswords', JSON.stringify(groupPasswords));
-  db.ref(`groups/${gid}/users/${userId}`).set({username,lastSeen:Date.now(),pfp});
-  updateGroupActivity();
-  document.getElementById('chatTitle').textContent='Group: '+gid;
-  addGroupToList(gid);
-  listenMessages();
-  renderParticipants();
-}
-
-// Sidebar
-function addGroupToList(gid){
-  const list=document.getElementById('groupList');
-  if([...list.children].some(c=>c.textContent===gid))return;
-  const div=document.createElement('div');div.className='group-item';div.textContent=gid;
-  div.onclick=async ()=>{
-    activeGroupId=gid;
-    activeDmId=null;
-    document.getElementById('chatTitle').textContent='Group: '+gid;
-    encryptionKey = await deriveKey(groupPasswords[gid], gid);
-    listenMessages();
-    renderParticipants();
-  }
-  list.appendChild(div);
-}
-
-// Send text
-async function sendMessage(){
-  if(!activeGroupId && !activeDmId)return;
-  const text=document.getElementById('messageText').value.trim();if(!text)return;
-  const encryptedObj=await encryptData(new TextEncoder().encode(text));
-  let msgRef;
-  if(activeGroupId) msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
-  else msgRef = db.ref(`dms/${[userId,activeDmId].sort().join('_')}`).push();
-  msgRef.set({userId,username,pfp,encryptedText:encryptedObj,timestamp:Date.now()});
-  setTimeout(()=>msgRef.remove(), activeGroupId?24*60*60*1000:24*60*60*1000);
-  document.getElementById('messageText').value='';
-  updateGroupActivity();
-}
-
-// Send image
-async function sendImage(event){
-  if(!activeGroupId && !activeDmId)return;
-  const file=event.target.files[0];if(!file)return;
-  const arrayBuffer=await file.arrayBuffer();
-  const encryptedObj=await encryptData(arrayBuffer);
-  let msgRef;
-  if(activeGroupId) msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
-  else msgRef = db.ref(`dms/${[userId,activeDmId].sort().join('_')}`).push();
-  msgRef.set({userId,username,pfp,encryptedImage:encryptedObj,timestamp:Date.now()});
-  setTimeout(()=>msgRef.remove(),60*1000);
-  event.target.value='';
-  updateGroupActivity();
-}
-
-// Listen messages
-function listenMessages(){
-  const chatArea=document.getElementById('chatArea');chatArea.innerHTML='';
-  let ref;
-  if(activeGroupId) ref=db.ref(`groups/${activeGroupId}/messages`);
-  else if(activeDmId) ref=db.ref(`dms/${[userId,activeDmId].sort().join('_')}`);
-  if(!ref) return;
-  ref.off();
-  ref.on('child_added', async snap=>{
-    const msg=snap.val();
-    const div=document.createElement('div'); 
-    div.classList.add('message',msg.userId===userId?'outgoing':'incoming');
-    try{
-      let content = '';
-      if(msg.encryptedText) content = new TextDecoder().decode(await decryptData(msg.encryptedText));
-      else if(msg.encryptedImage){
-        const blob = new Blob([await decryptData(msg.encryptedImage)]);
-        const url = URL.createObjectURL(blob);
-        content = `<img src="${url}" class="message-img">`;
-      }
-      div.innerHTML = `<div class="message-sender"><img src="${msg.pfp||''}" style="width:20px;height:20px;border-radius:50%;"> ${msg.username}</div>${content}`;
-    }catch{div.innerHTML = `<div class="message-sender">${msg.username}</div>[Cannot decrypt]`;}
-    chatArea.appendChild(div); chatArea.scrollTop=chatArea.scrollHeight;
-  });
-}
-
-// Participants list
-const participantsToggle = document.getElementById('participantsToggle');
-const participantsList = document.getElementById('participantsList');
-participantsToggle.addEventListener('click', e=>{participantsList.style.display = participantsList.style.display==='flex'?'none':'flex'; participantsList.style.flexDirection='column';});
-document.addEventListener('click', e=>{if(!participantsList.contains(e.target) && e.target!==participantsToggle) participantsList.style.display='none';});
-async function renderParticipants(){
-  if(!activeGroupId) return;
-  const snap = await db.ref(`groups/${activeGroupId}/users`).get();
-  participantsList.innerHTML=''; 
-  snap.forEach(s=>{
-    const u = s.val();
-    const div = document.createElement('div'); div.className='participant-item';
-    div.innerHTML = `<img src="${u.pfp||''}">${u.username}`;
-    div.onclick = async ()=>{
-      activeDmId = s.key;
-      activeGroupId = null;
-      document.getElementById('chatTitle').textContent='DM: '+u.username;
-      encryptionKey = await deriveKey(groupPasswords[activeGroupId]||'dummy', activeDmId); 
-      listenMessages();
-      participantsList.style.display='none';
-    }
-    participantsList.appendChild(div);
-  });
-}
-
-// Auto-restore group if sessionStorage has password
-window.addEventListener('load', async ()=>{
-  if(activeGroupId && groupPasswords[activeGroupId]){
-    encryptionKey = await deriveKey(groupPasswords[activeGroupId], activeGroupId);
-    addGroupToList(activeGroupId);
-    document.getElementById('chatTitle').textContent='Group: '+activeGroupId;
-    listenMessages();
-    renderParticipants();
-  }
-});
-</script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="script.js"></script>
 </body>
-  </html>
+</html>
