@@ -8,8 +8,8 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}
 html,body{height:100%;width:100%;}
-.container{display:flex;height:100%;width:100%;overflow:hidden;}
-.sidebar{width:280px;background:#4f46e5;color:white;display:flex;flex-direction:column;padding:20px;}
+.container{display:flex;height:100%;width:100%;overflow:hidden;position:relative;}
+.sidebar{width:280px;background:#4f46e5;color:white;display:flex;flex-direction:column;padding:20px;flex-shrink:0;}
 .sidebar h2{margin-bottom:15px;font-size:1.3rem;}
 .group-list{flex:1;overflow-y:auto;margin-bottom:15px;}
 .group-item{background: rgba(255,255,255,0.1); border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;transition:0.3s;}
@@ -17,7 +17,7 @@ html,body{height:100%;width:100%;}
 .join-group{display:flex;flex-direction:column;gap:8px;}
 .join-group input{padding:10px;border:none;border-radius:8px;}
 .join-group button{padding:10px;border:none;border-radius:8px;background:#2563eb;color:white;cursor:pointer;font-weight:600;}
-.main{flex:1;display:flex;flex-direction:column;height:100%;}
+.main{flex:1;display:flex;flex-direction:column;height:100%;position:relative;}
 .chat-header{padding:15px;background:#6366f1;color:white;font-size:1.2rem;box-shadow:0 2px 6px rgba(0,0,0,0.2);display:flex;justify-content:space-between;align-items:center;}
 .chat-area{flex:1;padding:15px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#f9fafc;}
 .message{padding:12px 18px;border-radius:24px;max-width:70%;word-break:break-word;position:relative;animation:fadeIn 0.3s;box-shadow:0 3px 10px rgba(0,0,0,0.1);}
@@ -29,8 +29,10 @@ html,body{height:100%;width:100%;}
 .message-input input[type=text]{flex:1;padding:10px;border-radius:12px;border:1px solid #ddd;}
 .message-input input[type=file]{display:none;}
 .btn-file{padding:10px;border-radius:8px;background:#6b7280;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-.participants-panel{position:absolute;top:0;right:0;width:200px;height:100%;background:#f3f4f6;box-shadow:-3px 0 10px rgba(0,0,0,0.2);padding:10px;overflow-y:auto;display:none;}
+.participants-panel{width:200px;background:#f3f4f6;position:absolute;top:0;right:-200px;height:100%;box-shadow:-3px 0 10px rgba(0,0,0,0.15);transition:0.3s;padding:15px;overflow-y:auto;z-index:10;}
+.participants-panel.show{right:0;}
 .participants-panel h3{margin-bottom:10px;}
+.participant{padding:8px 10px;border-radius:8px;background:#e5e7eb;margin-bottom:6px;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -45,13 +47,12 @@ html,body{height:100%;width:100%;}
       <input type="text" id="groupIdInput" placeholder="Group ID">
       <input type="password" id="groupPasswordInput" placeholder="Group Password">
       <button onclick="joinGroup()">Join/Create</button>
-      <button onclick="leaveGroup()">Leave Group</button>
     </div>
   </div>
   <div class="main">
     <div class="chat-header">
       <span id="chatHeader">Select or Join a Group</span>
-      <button onclick="toggleParticipants()">Participants</button>
+      <button onclick="toggleParticipants()" style="background:#4f46e5;color:white;padding:5px 10px;border-radius:8px;cursor:pointer;"><i class="fas fa-users"></i></button>
     </div>
     <div class="chat-area" id="chatArea"></div>
     <div class="message-input">
@@ -62,10 +63,10 @@ html,body{height:100%;width:100%;}
       </label>
       <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
     </div>
-    <div class="participants-panel" id="participantsPanel">
-      <h3>Participants</h3>
-      <ul id="participantsList"></ul>
-    </div>
+  </div>
+  <div class="participants-panel" id="participantsPanel">
+    <h3>Participants</h3>
+    <div id="participantsList"></div>
   </div>
 </div>
 
@@ -87,22 +88,22 @@ const db = firebase.database();
 const adjectives = ['Mysterious','Anonymous','Secret','Hidden','Stealthy','Private','Unknown','Incognito','Covert','Discreet'];
 const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
 function generateUsername(){return adjectives[Math.floor(Math.random()*adjectives.length)]+nouns[Math.floor(Math.random()*nouns.length)]+Math.floor(Math.random()*1000);}
-let username = generateUsername();
 
-// State
-let userId = localStorage.getItem('userId') || (Math.random().toString(36).substring(2)+Date.now().toString(36));
-localStorage.setItem('userId',userId);
+// Persistent username & userId
+let username = localStorage.getItem('username');
+if(!username){username=generateUsername();localStorage.setItem('username',username);}
+let userId = localStorage.getItem('userId');
+if(!userId){userId=(Math.random().toString(36).substring(2)+Date.now().toString(36));localStorage.setItem('userId',userId);}
+
 let activeGroupId=null;
 let encryptionKey=null;
 
-// Derive AES-GCM key
+// AES-GCM key
 async function deriveKey(password,saltStr){
   const salt=new TextEncoder().encode(saltStr);
   const keyMaterial=await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
-
-// Encrypt/Decrypt helpers
 async function encryptData(data){const iv=crypto.getRandomValues(new Uint8Array(12));const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},encryptionKey,data);return {iv:Array.from(iv),data:btoa(String.fromCharCode(...new Uint8Array(encrypted)))};}
 async function decryptData(obj){return await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(obj.iv)},encryptionKey,Uint8Array.from(atob(obj.data),c=>c.charCodeAt(0)));}
 
@@ -116,27 +117,12 @@ async function joinGroup(){
   if(!gid||!pwd)return alert('Enter Group ID and Password');
   activeGroupId=gid;
   encryptionKey=await deriveKey(pwd,gid);
-  localStorage.setItem('activeGroupId', gid);
-  localStorage.setItem('groupPassword', pwd);
   db.ref(`groups/${gid}/users/${userId}`).set({username,lastSeen:Date.now()});
   updateGroupActivity();
   document.getElementById('chatHeader').textContent='Group: '+gid;
   addGroupToList(gid);
   listenMessages();
-  updateParticipants();
-}
-
-// Leave group
-function leaveGroup(){
-  if(!activeGroupId)return;
-  db.ref(`groups/${activeGroupId}/users/${userId}`).remove();
-  localStorage.removeItem('activeGroupId');
-  localStorage.removeItem('groupPassword');
-  activeGroupId = null;
-  encryptionKey = null;
-  document.getElementById('chatArea').innerHTML = '';
-  document.getElementById('chatHeader').textContent = 'Select or Join a Group';
-  document.getElementById('participantsList').innerHTML = '';
+  listenParticipants();
 }
 
 // Sidebar
@@ -144,7 +130,7 @@ function addGroupToList(gid){
   const list=document.getElementById('groupList');
   if([...list.children].some(c=>c.textContent===gid))return;
   const div=document.createElement('div');div.className='group-item active';div.textContent=gid;
-  div.onclick=()=>{activeGroupId=gid;document.getElementById('chatHeader').textContent='Group: '+gid; listenMessages(); updateParticipants();}
+  div.onclick=()=>{activeGroupId=gid;document.getElementById('chatHeader').textContent='Group: '+gid; listenMessages(); listenParticipants();}
   list.appendChild(div);
 }
 
@@ -191,38 +177,21 @@ function listenMessages(){
 }
 
 // Participants
-function toggleParticipants(){
-  const panel = document.getElementById('participantsPanel');
-  panel.style.display = panel.style.display==='none'?'block':'none';
-}
-async function updateParticipants(){
+function toggleParticipants(){document.getElementById('participantsPanel').classList.toggle('show');}
+function listenParticipants(){
   if(!activeGroupId)return;
-  const listElem = document.getElementById('participantsList');
-  listElem.innerHTML='';
-  const ref = db.ref(`groups/${activeGroupId}/users`);
-  ref.on('value', snap=>{
-    listElem.innerHTML='';
+  const panel=document.getElementById('participantsList');panel.innerHTML='';
+  const ref=db.ref(`groups/${activeGroupId}/users`);
+  ref.off();
+  ref.on('value',snap=>{
+    panel.innerHTML='';
     snap.forEach(child=>{
-      const li = document.createElement('li');
-      li.textContent = child.val().username;
-      listElem.appendChild(li);
+      const p=child.val();
+      const div=document.createElement('div');div.className='participant';div.textContent=p.username;
+      panel.appendChild(div);
     });
   });
 }
-
-// Restore group on reload
-window.addEventListener('load', async () => {
-  const savedGid = localStorage.getItem('activeGroupId');
-  const savedPwd = localStorage.getItem('groupPassword');
-  if(savedGid && savedPwd){
-    activeGroupId = savedGid;
-    encryptionKey = await deriveKey(savedPwd, savedGid);
-    addGroupToList(savedGid);
-    document.getElementById('chatHeader').textContent = 'Group: ' + savedGid;
-    listenMessages();
-    updateParticipants();
-  }
-});
 </script>
 </body>
-  </html>
+        </html>
