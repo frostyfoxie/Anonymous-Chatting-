@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Secure Encrypted Chat with Images</title>
+<title>Secure Encrypted Chat</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}
-body{height:100vh;display:flex;}
-.container{display:flex;flex:1;width:100vw;height:100vh;}
+body,html{height:100%;width:100%;display:flex;overflow:hidden;}
+.container{display:flex;flex:1;width:100%;height:100%;}
 .sidebar{width:280px;background:#4f46e5;color:white;display:flex;flex-direction:column;padding:20px;}
 .sidebar h2{margin-bottom:15px;font-size:1.3rem;}
 .group-list{flex:1;overflow-y:auto;}
@@ -34,7 +34,6 @@ body{height:100vh;display:flex;}
 </style>
 </head>
 <body>
-
 <div class="container">
   <div class="sidebar">
     <h2><i class="fas fa-users"></i> Groups</h2>
@@ -84,18 +83,18 @@ let groups = {};
 let activeGroupId = null;
 let encryptionKey = null;
 
-async function deriveKey(password, salt) {
+async function deriveKey(password, salt){
   const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
-  return await crypto.subtle.deriveKey({name:'PBKDF2', salt:new TextEncoder().encode(salt), iterations:100000, hash:'SHA-256'}, keyMaterial, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+  return await crypto.subtle.deriveKey({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'}, keyMaterial, {name:'AES-GCM',length:256}, false, ['encrypt','decrypt']);
 }
 
-async function encryptText(text) {
+async function encryptText(text){
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt({name:'AES-GCM', iv}, encryptionKey, new TextEncoder().encode(text));
   return JSON.stringify({iv:Array.from(iv), data:Array.from(new Uint8Array(encrypted))});
 }
 
-async function decryptText(payload) {
+async function decryptText(payload){
   const obj = JSON.parse(payload);
   const iv = new Uint8Array(obj.iv);
   const data = new Uint8Array(obj.data);
@@ -103,7 +102,7 @@ async function decryptText(payload) {
   return new TextDecoder().decode(decrypted);
 }
 
-function createGroup() {
+function createGroup(){
   const id = Math.random().toString(36).substring(2,8).toUpperCase();
   const pwd = Math.random().toString(36).substring(2,10);
   document.getElementById('groupId').value = id;
@@ -111,28 +110,28 @@ function createGroup() {
   alert(`Group Created!\nID: ${id}\nPassword: ${pwd}`);
 }
 
-async function joinGroup() {
+async function joinGroup(){
   const groupId = document.getElementById('groupId').value.trim();
   const password = document.getElementById('groupPassword').value;
   if(!groupId || !password){alert('Enter both Group ID and Password'); return;}
-  
   encryptionKey = await deriveKey(password, groupId);
   activeGroupId = groupId;
-  if(!groups[groupId]) groups[groupId] = true;
+  if(!groups[groupId]) groups[groupId]=true;
   renderGroupList();
-  document.getElementById('chatHeader').innerText = `Group: ${groupId}`;
+  document.getElementById('chatHeader').innerText=`Group: ${groupId}`;
   listenMessages();
+  cleanOldMessages(24);
 }
 
 function renderGroupList(){
-  const list = document.getElementById('groupList');
-  list.innerHTML = '';
+  const list=document.getElementById('groupList');
+  list.innerHTML='';
   Object.keys(groups).forEach(g=>{
-    const div = document.createElement('div');
+    const div=document.createElement('div');
     div.classList.add('group-item');
     if(g===activeGroupId) div.classList.add('active');
-    div.innerText = g;
-    div.onclick = ()=>{activeGroupId=g; document.getElementById('chatHeader').innerText=`Group: ${g}`; listenMessages();}
+    div.innerText=g;
+    div.onclick=()=>{activeGroupId=g; document.getElementById('chatHeader').innerText=`Group: ${g}`; listenMessages();}
     list.appendChild(div);
   });
 }
@@ -140,9 +139,9 @@ function renderGroupList(){
 async function sendMessage(){
   const msgInput = document.getElementById('messageText');
   const text = msgInput.value.trim();
-  if(!text || !activeGroupId) return;
+  if(!text||!activeGroupId) return;
   const encrypted = await encryptText(text);
-  db.ref(`groups/${activeGroupId}/messages`).push({userId, username, encryptedText:encrypted, timestamp:Date.now()});
+  db.ref(`groups/${activeGroupId}/messages`).push({userId,username,encryptedText:encrypted,timestamp:Date.now()});
   msgInput.value='';
 }
 
@@ -150,49 +149,54 @@ async function sendImage(event){
   if(!activeGroupId) return;
   const file = event.target.files[0];
   if(!file) return;
-
   const arrayBuffer = await file.arrayBuffer();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encryptedBuffer = await crypto.subtle.encrypt({name:'AES-GCM', iv}, encryptionKey, arrayBuffer);
-
-  const blob = new Blob([new Uint8Array(encryptedBuffer)]);
+  const blob = new Blob([encryptedBuffer]);
   const storageRef = storage.ref(`groups/${activeGroupId}/${Date.now()}_${file.name}`);
-  const uploadTask = storageRef.put(blob);
-
-  uploadTask.on('state_changed', null, console.error, async ()=>{
+  storageRef.put(blob).then(async ()=>{
     const url = await storageRef.getDownloadURL();
-    const encryptedMeta = await encryptText(url); // encrypt the download URL
-    db.ref(`groups/${activeGroupId}/messages`).push({userId, username, encryptedImage:encryptedMeta, timestamp:Date.now()});
-  });
-
+    const encryptedMeta = await encryptText(url);
+    db.ref(`groups/${activeGroupId}/messages`).push({userId,username,encryptedImage:encryptedMeta,timestamp:Date.now()});
+  }).catch(console.error);
   event.target.value='';
 }
 
 function listenMessages(){
   if(!activeGroupId) return;
-  const chatArea = document.getElementById('chatArea');
+  const chatArea=document.getElementById('chatArea');
   chatArea.innerHTML='';
-  const ref = db.ref(`groups/${activeGroupId}/messages`);
+  const ref=db.ref(`groups/${activeGroupId}/messages`);
   ref.off();
-  ref.on('child_added', async snapshot=>{
-    const msg = snapshot.val();
-    const div = document.createElement('div');
+  ref.on('child_added',async snapshot=>{
+    const msg=snapshot.val();
+    const div=document.createElement('div');
     div.classList.add('message');
     div.classList.add(msg.userId===userId?'outgoing':'incoming');
-    let content='';
     if(msg.encryptedText){
-      try{content=await decryptText(msg.encryptedText);}catch{content='[Cannot decrypt]';}
-      div.innerHTML=`<div class="message-sender">${msg.username}</div>${content}`;
+      try{const content=await decryptText(msg.encryptedText); div.innerHTML=`<div class="message-sender">${msg.username}</div>${content}`;}
+      catch{div.innerHTML=`<div class="message-sender">${msg.username}</div>[Cannot decrypt]`;}
     }else if(msg.encryptedImage){
-      try{
-        const url = await decryptText(msg.encryptedImage);
-        div.innerHTML=`<div class="message-sender">${msg.username}</div><img src="${url}" class="message-img">`;
-      }catch{div.innerHTML=`<div class="message-sender">${msg.username}</div>[Cannot decrypt image]`;}
+      try{const url=await decryptText(msg.encryptedImage); div.innerHTML=`<div class="message-sender">${msg.username}</div><img src="${url}" class="message-img">`;}
+      catch{div.innerHTML=`<div class="message-sender">${msg.username}</div>[Cannot decrypt image]`;}
     }
     chatArea.appendChild(div);
-    chatArea.scrollTop = chatArea.scrollHeight;
+    chatArea.scrollTop=chatArea.scrollHeight;
   });
 }
+
+// Auto-delete messages older than N hours
+function cleanOldMessages(hours=24){
+  if(!activeGroupId) return;
+  const cutoff=Date.now()-hours*3600*1000;
+  const ref=db.ref(`groups/${activeGroupId}/messages`);
+  ref.orderByChild('timestamp').endAt(cutoff).once('value',snapshot=>{
+    snapshot.forEach(child=>child.ref.remove());
+  });
+}
+
+// Run cleanup periodically
+setInterval(()=>cleanOldMessages(24),30*60*1000);
 </script>
 </body>
- </html>
+</html>
