@@ -1,4 +1,4 @@
-// ==================== Firebase Config ====================
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
   authDomain: "anonymous-chatting-c6712.firebaseapp.com",
@@ -11,208 +11,217 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ==================== USER INITIALIZATION ====================
-const adjectives = ['Mysterious','Anonymous','Secret','Hidden','Stealthy','Private','Unknown','Incognito','Covert','Discreet'];
-const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
-
-function generateUsername() {
-  return adjectives[Math.floor(Math.random()*adjectives.length)] + 
-         nouns[Math.floor(Math.random()*nouns.length)] + 
-         Math.floor(Math.random()*1000);
-}
-
-// Persist username
+// Generate persistent username
 let username = localStorage.getItem('username');
-if (!username) {
-  username = generateUsername();
+if(!username) {
+  const adjectives = ['Mysterious','Anonymous','Secret','Hidden','Stealthy','Private','Unknown','Incognito','Covert','Discreet'];
+  const nouns = ['Phoenix','Panther','Fox','Falcon','Wolf','Eagle','Lion','Tiger','Hawk','Owl'];
+  username = adjectives[Math.floor(Math.random()*adjectives.length)] + nouns[Math.floor(Math.random()*nouns.length)] + Math.floor(Math.random()*1000);
   localStorage.setItem('username', username);
 }
 
-// Persist userId
-let userId = localStorage.getItem('userId');
-if (!userId) {
-  userId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-  localStorage.setItem('userId', userId);
-}
+// User ID
+let userId = localStorage.getItem('userId') || (Math.random().toString(36).substring(2)+Date.now().toString(36));
+localStorage.setItem('userId', userId);
 
-// Default profile picture
-let userPFP = localStorage.getItem('userPFP') || "https://placehold.co/50x50/667EEA/FFFFFF?text=You";
-
-// ==================== STATE ====================
+// State
 let activeGroupId = null;
 let encryptionKey = null;
-let activeDMUserId = null; // For direct messages
 
-// ==================== ENCRYPTION FUNCTIONS ====================
-async function deriveKey(password, saltStr) {
-  const salt = new TextEncoder().encode(saltStr);
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
+// UI Elements
+const chatArea = document.getElementById('chatArea');
+const chatName = document.getElementById('chatName');
+const chatAvatar = document.getElementById('chatAvatar');
+const memberCount = document.getElementById('memberCount');
+const participantsPanel = document.getElementById('participantsPanel');
+const sidebar = document.getElementById('sidebar');
+const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+const toggleParticipantsBtn = document.getElementById('toggleParticipantsBtn');
+
+// Sidebar toggle (mobile)
+toggleSidebarBtn.addEventListener('click', () => {
+  sidebar.classList.toggle('hide');
+});
+
+// Participants panel toggle
+toggleParticipantsBtn.addEventListener('click', () => {
+  participantsPanel.classList.toggle('hidden');
+});
+
+// Hide participants panel on outside click
+document.addEventListener('click', (e)=>{
+  if(!participantsPanel.contains(e.target) && !toggleParticipantsBtn.contains(e.target)){
+    participantsPanel.classList.add('hidden');
+  }
+});
+
+// Derive AES key
+async function deriveKey(password,saltStr){
+  const salt=new TextEncoder().encode(saltStr);
+  const keyMaterial=await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {name:'PBKDF2'}, false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'},keyMaterial,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
 
-async function encryptData(data) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    encryptionKey,
-    data
-  );
-  return { iv: Array.from(iv), data: btoa(String.fromCharCode(...new Uint8Array(encrypted))) };
+// Encrypt/Decrypt helpers
+async function encryptData(data){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const encrypted=await crypto.subtle.encrypt({name:'AES-GCM',iv},encryptionKey,data);
+  return {iv:Array.from(iv),data:btoa(String.fromCharCode(...new Uint8Array(encrypted)))};
+}
+async function decryptData(obj){
+  return await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(obj.iv)},encryptionKey,Uint8Array.from(atob(obj.data),c=>c.charCodeAt(0)));
 }
 
-async function decryptData(obj) {
-  return await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: new Uint8Array(obj.iv) },
-    encryptionKey,
-    Uint8Array.from(atob(obj.data), c => c.charCodeAt(0))
-  );
+// Join group
+async function joinGroup(){
+  const gid=document.getElementById('groupIdInput').value.trim();
+  const pwd=document.getElementById('groupPasswordInput').value;
+  if(!gid||!pwd) return alert('Enter Group ID and Password');
+
+  activeGroupId = gid;
+  encryptionKey = await deriveKey(pwd, gid);
+
+  db.ref(`groups/${gid}/users/${userId}`).set({username,lastSeen:Date.now()});
+  db.ref(`groups/${gid}/lastActive`).set(Date.now());
+
+  chatName.textContent = 'Group: '+gid;
+  chatAvatar.textContent = gid.charAt(0).toUpperCase();
+  memberCount.textContent = 'Loading...';
+
+  addGroupToList(gid);
+  listenMessages();
+  listenParticipants();
 }
 
-// ==================== GROUP MANAGEMENT ====================
-function addGroupToList(gid) {
-  const list = document.getElementById('groupList');
-  if ([...list.children].some(c => c.dataset.gid === gid)) return;
+// Sidebar group list
+function addGroupToList(gid){
+  const list=document.getElementById('groupList');
+  if([...list.children].some(c=>c.textContent===gid)) return;
 
-  const div = document.createElement('div');
-  div.className = 'group-item';
-  div.dataset.gid = gid;
+  const div=document.createElement('li');
+  div.className='group-item p-3 rounded-md cursor-pointer hover:bg-gray-100 flex items-center justify-between';
   div.textContent = gid;
   div.onclick = () => {
-    activeGroupId = gid;
-    activeDMUserId = null;
-    document.getElementById('chatHeader').textContent = 'Group: ' + gid;
+    activeGroupId=gid;
+    chatName.textContent='Group: '+gid;
+    chatAvatar.textContent = gid.charAt(0).toUpperCase();
     listenMessages();
-  };
+    listenParticipants();
+  }
   list.appendChild(div);
 }
 
-async function joinGroup() {
-  const gid = document.getElementById('groupIdInput').value.trim();
-  const pwd = document.getElementById('groupPasswordInput').value;
-  if (!gid || !pwd) return alert('Enter Group ID and Password');
-  
-  activeGroupId = gid;
-  encryptionKey = await deriveKey(pwd, gid);
-  
-  db.ref(`groups/${gid}/users/${userId}`).set({
-    username,
-    pfp: userPFP,
-    lastSeen: Date.now()
-  });
-  
-  document.getElementById('chatHeader').textContent = 'Group: ' + gid;
-  addGroupToList(gid);
-  listenMessages();
+// Send message
+async function sendMessage(){
+  if(!activeGroupId) return;
+  const text = document.getElementById('messageText').value.trim();
+  if(!text) return;
+  const encryptedObj = await encryptData(new TextEncoder().encode(text));
+  const msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
+  msgRef.set({userId,username,encryptedText:encryptedObj,timestamp:Date.now()});
+  document.getElementById('messageText').value='';
 }
 
-// ==================== MESSAGE FUNCTIONS ====================
-async function sendMessage(text) {
-  if (!activeGroupId && !activeDMUserId) return;
-  if (!text) return;
-
-  const msgObj = { userId, username, pfp: userPFP, timestamp: Date.now() };
-
-  if (activeGroupId) {
-    msgObj.encryptedText = await encryptData(new TextEncoder().encode(text));
-    const msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
-    msgRef.set(msgObj);
-    setTimeout(() => msgRef.remove(), 24*60*60*1000);
-  } else if (activeDMUserId) {
-    msgObj.encryptedText = await encryptData(new TextEncoder().encode(text));
-    const path = `dms/${[userId,activeDMUserId].sort().join('_')}`;
-    const msgRef = db.ref(`${path}`).push();
-    msgRef.set(msgObj);
-  }
-
-  document.getElementById('messageText').value = '';
+// Send attachment
+async function sendAttachment(event){
+  if(!activeGroupId) return;
+  const file = event.target.files[0]; if(!file) return;
+  const buffer = await file.arrayBuffer();
+  const encryptedObj = await encryptData(buffer);
+  const msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
+  msgRef.set({userId,username,encryptedFile:encryptedObj,filename:file.name,timestamp:Date.now()});
+  event.target.value='';
 }
 
-// ==================== IMAGE ATTACHMENTS ====================
-async function sendImage(file) {
-  if (!file) return;
-  const arrayBuffer = await file.arrayBuffer();
-  const encryptedObj = await encryptData(arrayBuffer);
-
-  const msgObj = { userId, username, pfp: userPFP, timestamp: Date.now(), encryptedImage: encryptedObj };
-
-  if (activeGroupId) {
-    const msgRef = db.ref(`groups/${activeGroupId}/messages`).push();
-    msgRef.set(msgObj);
-    setTimeout(() => msgRef.remove(), 60*1000);
-  } else if (activeDMUserId) {
-    const path = `dms/${[userId,activeDMUserId].sort().join('_')}`;
-    const msgRef = db.ref(`${path}`).push();
-    msgRef.set(msgObj);
-  }
-}
-
-// ==================== LISTEN TO MESSAGES ====================
-function listenMessages() {
-  const chatArea = document.getElementById('chatArea');
-  chatArea.innerHTML = '';
-
-  let ref;
-  if (activeGroupId) ref = db.ref(`groups/${activeGroupId}/messages`);
-  else if (activeDMUserId) ref = db.ref(`dms/${[userId,activeDMUserId].sort().join('_')}`);
-  else return;
-
+// Listen messages
+function listenMessages(){
+  if(!activeGroupId) return;
+  chatArea.innerHTML='';
+  const ref=db.ref(`groups/${activeGroupId}/messages`);
   ref.off();
-  ref.on('child_added', async snap => {
+  ref.on('child_added', async snap=>{
     const msg = snap.val();
     const div = document.createElement('div');
-    div.classList.add('message', msg.userId === userId ? 'outgoing' : 'incoming');
-
-    try {
-      if (msg.encryptedText) {
+    div.className = msg.userId===userId ? 'message outgoing' : 'message incoming';
+    try{
+      if(msg.encryptedText){
         const decrypted = new TextDecoder().decode(await decryptData(msg.encryptedText));
-        div.innerHTML = `<div class="message-sender"><img src="${msg.pfp}" class="w-6 h-6 rounded-full inline mr-2">${msg.username}</div>${decrypted}`;
-      } else if (msg.encryptedImage) {
-        const decrypted = new Blob([await decryptData(msg.encryptedImage)]);
-        const url = URL.createObjectURL(decrypted);
-        div.innerHTML = `<div class="message-sender"><img src="${msg.pfp}" class="w-6 h-6 rounded-full inline mr-2">${msg.username}</div><img src="${url}" class="message-img">`;
+        div.innerHTML = `<div class="sender">${msg.username}</div><div class="text">${decrypted}</div>`;
+      } else if(msg.encryptedFile){
+        const blob = new Blob([await decryptData(msg.encryptedFile)]);
+        const url = URL.createObjectURL(blob);
+        div.innerHTML = `<div class="sender">${msg.username}</div><a href="${url}" target="_blank">${msg.filename}</a>`;
       }
-    } catch {
-      div.innerHTML = `<div class="message-sender">${msg.username}</div>[Cannot decrypt]`;
-    }
-
+    }catch{ div.innerHTML = `<div class="sender">${msg.username}</div>[Cannot decrypt]`; }
     chatArea.appendChild(div);
     chatArea.scrollTop = chatArea.scrollHeight;
   });
 }
 
-// ==================== PROFILE PICTURE ====================
-function updatePFP(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    userPFP = reader.result;
-    localStorage.setItem('userPFP', userPFP);
-  };
-  reader.readAsDataURL(file);
+// Participants list
+function listenParticipants(){
+  if(!activeGroupId) return;
+  participantsPanel.innerHTML='';
+  const ref=db.ref(`groups/${activeGroupId}/users`);
+  ref.on('value', snap=>{
+    participantsPanel.innerHTML='';
+    const users = snap.val();
+    if(!users) return;
+    memberCount.textContent = Object.keys(users).length + ' members';
+    Object.entries(users).forEach(([id,user])=>{
+      const div = document.createElement('div');
+      div.className='participant-item p-2 flex items-center justify-between hover:bg-gray-100 rounded-md cursor-pointer';
+      div.innerHTML = `<span>${user.username}</span><button onclick="startDM('${id}','${user.username}')">DM</button>`;
+      participantsPanel.appendChild(div);
+    });
+  });
 }
 
-// ==================== DM FUNCTIONS ====================
-function startDM(targetUserId, targetUsername, targetPFP) {
-  activeDMUserId = targetUserId;
-  activeGroupId = null;
-  document.getElementById('chatHeader').textContent = 'DM: ' + targetUsername;
-  listenMessages();
+// DM functionality
+let activeDMUserId = null;
+async function startDM(dmId, dmName){
+  activeDMUserId = dmId;
+  chatName.textContent = 'DM: '+dmName;
+  chatAvatar.textContent = dmName.charAt(0).toUpperCase();
+  chatArea.innerHTML = '';
+  // For DM, listen on separate path
+  const ref = db.ref(`DMs/${userId}_${dmId}`);
+  ref.off();
+  ref.on('child_added', async snap=>{
+    const msg = snap.val();
+    const div = document.createElement('div');
+    div.className = msg.userId===userId ? 'message outgoing' : 'message incoming';
+    try{
+      if(msg.encryptedText){
+        const decrypted = new TextDecoder().decode(await decryptData(msg.encryptedText));
+        div.innerHTML = `<div class="sender">${msg.username}</div><div class="text">${decrypted}</div>`;
+      } else if(msg.encryptedFile){
+        const blob = new Blob([await decryptData(msg.encryptedFile)]);
+        const url = URL.createObjectURL(blob);
+        div.innerHTML = `<div class="sender">${msg.username}</div><a href="${url}" target="_blank">${msg.filename}</a>`;
+      }
+    }catch{ div.innerHTML = `<div class="sender">${msg.username}</div>[Cannot decrypt]`; }
+    chatArea.appendChild(div);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  });
 }
 
-// ==================== EXPORT FUNCTIONS ====================
-// These will be called from UI JS
-window.chatApp = {
-  joinGroup, sendMessage, sendImage, updatePFP, startDM
-};
+// Send message (DM or Group)
+async function sendMessage(){
+  const text = document.getElementById('messageText').value.trim();
+  if(!text) return;
+  const encryptedObj = await encryptData(new TextEncoder().encode(text));
+  const path = activeDMUserId ? `DMs/${userId}_${activeDMUserId}` : `groups/${activeGroupId}/messages`;
+  db.ref(path).push().set({userId,username,encryptedText:encryptedObj,timestamp:Date.now()});
+  document.getElementById('messageText').value='';
+}
+
+// Send attachment (DM or Group)
+async function sendAttachment(event){
+  const file = event.target.files[0]; if(!file) return;
+  const buffer = await file.arrayBuffer();
+  const encryptedObj = await encryptData(buffer);
+  const path = activeDMUserId ? `DMs/${userId}_${activeDMUserId}` : `groups/${activeGroupId}/messages`;
+  db.ref(path).push().set({userId,username,encryptedFile:encryptedObj,filename:file.name,timestamp:Date.now()});
+  event.target.value='';
+                                                  }
