@@ -1,57 +1,84 @@
-// =========================
-// base.js - Auto-delete for Anonymous Chat
-// =========================
+// auto-delete.js - Firebase message auto-deletion script
+// Add this to your index.html: <script src="auto-delete.js"></script>
 
-// ==== Testing durations (in milliseconds) ====
-const MESSAGE_LIFETIME = 10 * 1000;  // 10 seconds
-const FILE_LIFETIME = 10 * 1000;     // 10 seconds
-const USER_LIFETIME = 10 * 1000;     // 10 seconds
-const GROUP_LIFETIME = 10 * 1000;    // 10 seconds
+// Firebase config (use your existing config)
+const firebaseConfig = {
+  apiKey: "AIzaSyCqobhf4HFUdBIZJMF-s9uW3e0-EGh327I",
+  authDomain: "anonymous-chatting-c6712.firebaseapp.com",
+  databaseURL: "https://anonymous-chatting-c6712-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "anonymous-chatting-c6712",
+  storageBucket: "anonymous-chatting-c6712.appspot.com",
+  messagingSenderId: "124331866043",
+  appId: "1:124331866043:web:8be37be9d84974b4a0b69e"
+};
 
-// Cleanup function
-function autoCleanup() {
-  const now = Date.now();
-
-  firebase.database().ref('groups').once('value').then(snapshot => {
-    snapshot.forEach(groupSnap => {
-      const group = groupSnap.val();
-
-      // Delete messages & files in a single check
-      if (group.messages) {
-        Object.entries(group.messages).forEach(([msgId, msg]) => {
-          if (msg.timestamp) {
-            const age = now - msg.timestamp;
-            if (msg.encryptedText && age > MESSAGE_LIFETIME) {
-              groupSnap.ref.child('messages').child(msgId).remove();
-              console.log("Deleted message:", msgId);
-            }
-            if (msg.encryptedFile && age > FILE_LIFETIME) {
-              groupSnap.ref.child('messages').child(msgId).remove();
-              console.log("Deleted file:", msgId);
-            }
-          }
-        });
-      }
-
-      // Delete old users
-      if (group.users) {
-        Object.entries(group.users).forEach(([uid, user]) => {
-          if (user.joined && now - user.joined > USER_LIFETIME) {
-            groupSnap.ref.child('users').child(uid).remove();
-            console.log("Deleted user:", uid);
-          }
-        });
-      }
-
-      // Delete old groups
-      if (group.createdAt && now - group.createdAt > GROUP_LIFETIME) {
-        groupSnap.ref.remove();
-        console.log("Deleted group:", groupSnap.key);
-      }
-    });
-  }).catch(err => console.error("Auto-cleanup error:", err));
+// Initialize Firebase if not already initialized
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+} else {
+  firebase.app(); // Use already initialized app
 }
 
-// Run cleanup every 5 seconds for testing
-setInterval(autoCleanup, 5000);
-autoCleanup(); // Run immediately
+const db = firebase.database();
+
+// Function to delete messages older than 1 minute
+function deleteOldMessages() {
+  const now = Date.now();
+  const oneMinuteAgo = now - 60000; // 60 seconds * 1000 ms
+  
+  // Process groups
+  db.ref('groups').once('value').then((groupsSnapshot) => {
+    groupsSnapshot.forEach((groupSnapshot) => {
+      const groupKey = groupSnapshot.key;
+      const messagesRef = db.ref(`groups/${groupKey}/messages`);
+      
+      messagesRef.once('value').then((messagesSnapshot) => {
+        messagesSnapshot.forEach((messageSnapshot) => {
+          const message = messageSnapshot.val();
+          if (message.timestamp && message.timestamp < oneMinuteAgo) {
+            // Delete message if older than 1 minute
+            messageSnapshot.ref.remove()
+              .then(() => {
+                console.log(`Deleted old message from group ${groupKey}`);
+              })
+              .catch((error) => {
+                console.error("Error deleting message:", error);
+              });
+          }
+        });
+      });
+    });
+  });
+  
+  // Process DMs
+  db.ref('dms').once('value').then((dmsSnapshot) => {
+    dmsSnapshot.forEach((dmSnapshot) => {
+      const dmKey = dmSnapshot.key;
+      const messagesRef = db.ref(`dms/${dmKey}/messages`);
+      
+      messagesRef.once('value').then((messagesSnapshot) => {
+        messagesSnapshot.forEach((messageSnapshot) => {
+          const message = messageSnapshot.val();
+          if (message.timestamp && message.timestamp < oneMinuteAgo) {
+            // Delete message if older than 1 minute
+            messageSnapshot.ref.remove()
+              .then(() => {
+                console.log(`Deleted old message from DM ${dmKey}`);
+              })
+              .catch((error) => {
+                console.error("Error deleting message:", error);
+              });
+          }
+        });
+      });
+    });
+  });
+}
+
+// Run the deletion function every 30 seconds
+setInterval(deleteOldMessages, 30000);
+
+// Also run immediately when loaded
+deleteOldMessages();
+
+console.log("Auto-delete script loaded. Messages will be deleted after 1 minute.");
