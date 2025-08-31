@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bipedal Walker RL Simulation with Hands</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.12.0/dist/tf.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, #1a237e, #0d47a1);
+            color: white;
+        }
+        #container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 300px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+        #ui.hidden {
+            transform: translateX(-320px);
+        }
+        .ui-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        h1 {
+            font-size: 18px;
+            margin-top: 0;
+            color: #4fc3f7;
+        }
+        .progress-bar {
+            height: 20px;
+            width: 100%;
+            background: #333;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background: linear-gradient(to right, #4caf50, #8bc34a);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        button {
+            background: #4caf50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #388e3c;
+        }
+        button#startBtn.paused {
+            background: #f44336;
+        }
+        button#startBtn.paused:hover {
+            background: #d32f2f;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .stat {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        .controls {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .slider-container input {
+            width: 100%;
+        }
+        .instructions {
+            margin-top: 15px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        .camera-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .camera-controls button {
+            background: #2196f3;
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .camera-controls button:hover {
+            background: #1976d2;
+        }
+        .learning-status {
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            text-align: center;
+        }
+        #statusMessage {
+            color: #ffeb3b;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        <button class="ui-toggle" id="uiToggle">☰</button>
+        <div id="ui">
+            <h1>Bipedal Walker with Hands</h1>
+            <div>
+                <button id="startBtn">Start Learning</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+            <div class="progress-bar">
+                <div class="progress" id="progressBar"></div>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="generation">0</div>
+                    <div class="stat-label">Generation</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="distance">0.0m</div>
+                    <div class="stat-label">Distance</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="reward">0.0</div>
+                    <div class="stat-label">Reward</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="speed">0.0</div>
+                    <div class="stat-label">Speed</div>
+                </div>
+            </div>
+            <div class="learning-status">
+                <div id="statusMessage">Initializing...</div>
+            </div>
+            <div class="controls">
+                <div class="slider-container">
+                    <label for="speedSlider">Simulation Speed: <span id="speedValue">1.0x</span></label>
+                    <input type="range" id="speedSlider" min="0.1" max="5" step="0.1" value="1.0">
+                </div>
+                <div class="slider-container">
+                    <label for="mutationSlider">Mutation Rate: <span id="mutationValue">0.2</span></label>
+                    <input type="range" id="mutationSlider" min="0.05" max="0.5" step="0.05" value="0.2">
+                </div>
+            </div>
+            <div class="instructions">
+                <p>Drag to rotate camera, scroll to zoom. The robot learns to walk using a genetic algorithm. It receives rewards for moving forward and penalties for falling.</p>
+            </div>
+        </div>
+        <div class="camera-controls">
+            <div style="text-align: center; margin-bottom: 5px;">Camera</div>
+            <button id="cameraFront">↡</button>
+            <button id="cameraBack">↟</button>
+            <button id="cameraLeft">↢</button>
+            <button id="cameraRight">↣</button>
+            <button id="cameraTop">↥</button>
+            <button id="cameraReset">↺</button>
+        </div>
+    </div>
+
+    <script>
+        // Main simulation parameters
+        const SIMULATION_PARAMS = {
+            populationSize: 10,
+            maxTimesteps: 1000,
+            timeStep: 1/60,
+            mutationRate: 0.2,
+            eliteCount: 2
+        };
+
+        // DOM elements
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const uiToggle = document.getElementById('uiToggle');
+        const progressBar = document.getElementById('progressBar');
+        const generationElement = document.getElementById('generation');
+        const distanceElement = document.getElementById('distance');
+        const rewardElement = document.getElementById('reward');
+        const speedElement = document.getElementById('speed');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const mutationSlider = document.getElementById('mutationSlider');
+        const mutationValue = document.getElementById('mutationValue');
+        const cameraFront = document.getElementById('cameraFront');
+        const cameraBack = document.getElementById('cameraBack');
+        const cameraLeft = document.getElementById('cameraLeft');
+        const cameraRight = document.getElementById('cameraRight');
+        const cameraTop = document.getElementById('cameraTop');
+        const cameraReset = document.getElementById('cameraReset');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Three.js variables
+        let scene, camera, renderer, clock;
+        // Cannon.js variables
+        let world;
+        // Simulation variables
+        let walkers = [];
+        let generation = 0;
+        let bestBrain = null;
+        let isRunning = false;
+        let floorBody, floorMesh;
+        let simulationSpeed = 1.0;
+        let cameraDistance = 10;
+        let cameraTheta = 0;
+        let cameraPhi = Math.PI / 4;
+        let isDragging = false;
+        let previousMouseX = 0;
+        let previousMouseY = 0;
+
+        // Initialize the simulation
+        function init() {
+            // Initialize Three.js
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0d47a1);
+            scene.fog = new THREE.Fog(0x0d47a1, 20, 50);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            updateCameraPosition();
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+
+            // Initialize Cannon.js
+            world = new CANNON.World();
+            world.gravity.set(0, -9.82, 0);
+            world.broadphase = new CANNON.NaiveBroadphase();
+            world.solver.iterations = 10;
+
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0x606060);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 50;
+            directionalLight.shadow.camera.left = -20;
+            directionalLight.shadow.camera.right = 20;
+            directionalLight.shadow.camera.top = 20;
+            directionalLight.shadow.camera.bottom = -20;
+            scene.add(directionalLight);
+
+            // Create floor
+            const floorGeometry = new THREE.PlaneGeometry(50, 50);
+            const floorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x388e3c,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.receiveShadow = true;
+            scene.add(floorMesh);
+
+            const floorShape = new CANNON.Plane();
+            floorBody = new CANNON.Body({ mass: 0 });
+            floorBody.addShape(floorShape);
+            floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI/2);
+            world.addBody(floorBody);
+
+            // Add grid helper
+            const gridHelper = new THREE.GridHelper(50, 50, 0xffffff, 0xffffff);
+            gridHelper.material.opacity = 0.2;
+            gridHelper.material.transparent = true;
+            scene.add(gridHelper);
+
+            // Initialize clock
+            clock = new THREE.Clock();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // Mouse events for camera control
+            const canvas = document.getElementById('canvas');
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMouseX = e.clientX;
+                previousMouseY = e.clientY;
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - previousMouseX;
+                    const deltaY = e.clientY - previousMouseY;
+                    
+                    cameraTheta += deltaX * 0.01;
+                    cameraPhi += deltaY * 0.01;
+                    
+                    // Limit phi to avoid flipping
+                    cameraPhi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraPhi));
+                    
+                    updateCameraPosition();
+                    
+                    previousMouseX = e.clientX;
+                    previousMouseY = e.clientY;
+                }
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            canvas.addEventListener('wheel', (e) => {
+                cameraDistance += e.deltaY * 0.01;
+                cameraDistance = Math.max(3, Math.min(30, cameraDistance));
+                updateCameraPosition();
+                e.preventDefault();
+            });
+
+            // Create initial population
+            createPopulation();
+
+            // Start animation loop
+            animate();
+        }
+
+        function updateCameraPosition() {
+            const x = cameraDistance * Math.sin(cameraPhi) * Math.cos(cameraTheta);
+            const y = cameraDistance * Math.cos(cameraPhi);
+            const z = cameraDistance * Math.sin(cameraPhi) * Math.sin(cameraTheta);
+            
+            camera.position.set(x, y, z);
+            camera.lookAt(0, 1, 0);
+        }
+
+        // Create a population of walkers
+        function createPopulation() {
+            walkers = [];
+            
+            for (let i = 0; i < SIMULATION_PARAMS.populationSize; i++) {
+                const brain = bestBrain ? tf.clone(bestBrain) : createBrain();
+                const walker = new BipedalWalker(world, scene, brain);
+                walkers.push(walker);
+            }
+        }
+
+        // Create a neural network model
+        function createBrain() {
+            const model = tf.sequential();
+            model.add(tf.layers.dense({ units: 24, inputShape: [18], activation: 'relu' })); // Increased input for hands
+            model.add(tf.layers.dense({ units: 24, activation: 'relu' }));
+            model.add(tf.layers.dense({ units: 6, activation: 'tanh' })); // Increased output for hands
+            return model;
+        }
+
+        // Bipedal Walker class with hands
+        class BipedalWalker {
+            constructor(physicsWorld, scene, brain) {
+                this.world = physicsWorld;
+                this.scene = scene;
+                this.brain = brain;
+                this.bodies = [];
+                this.meshes = [];
+                this.joints = [];
+                this.alive = true;
+                this.reward = 0;
+                this.timeAlive = 0;
+                this.previousXPos = 0;
+                
+                this.createBody();
+            }
+
+            createBody() {
+                // Torso
+                const torsoShape = new CANNON.Box(new CANNON.Vec3(0.4, 0.6, 0.2));
+                const torsoBody = new CANNON.Body({ mass: 5 });
+                torsoBody.addShape(torsoShape);
+                torsoBody.position.set(0, 4, 0);
+                this.world.addBody(torsoBody);
+                this.bodies.push(torsoBody);
+
+                const torsoGeometry = new THREE.BoxGeometry(0.8, 1.2, 0.4);
+                const torsoMaterial = new THREE.MeshStandardMaterial({ color: 0x2196f3 });
+                const torsoMesh = new THREE.Mesh(torsoGeometry, torsoMaterial);
+                torsoMesh.castShadow = true;
+                this.scene.add(torsoMesh);
+                this.meshes.push(torsoMesh);
+
+                // Thighs and calves
+                const legPairs = [
+                    { x: -0.3, z: 0, side: -1 }, // Left leg
+                    { x: 0.3, z: 0, side: 1 }    // Right leg
+                ];
+
+                legPairs.forEach((leg, index) => {
+                    // Thigh
+                    const thighShape = new CANNON.Box(new CANNON.Vec3(0.1, 0.5, 0.1));
+                    const thighBody = new CANNON.Body({ mass: 2 });
+                    thighBody.addShape(thighShape);
+                    thighBody.position.set(leg.x, 2.8, leg.z);
+                    this.world.addBody(thighBody);
+                    this.bodies.push(thighBody);
+
+                    const thighGeometry = new THREE.BoxGeometry(0.2, 1.0, 0.2);
+                    const thighMaterial = new THREE.MeshStandardMaterial({ color: 0xff5722 });
+                    const thighMesh = new THREE.Mesh(thighGeometry, thighMaterial);
+                    thighMesh.castShadow = true;
+                    this.scene.add(thighMesh);
+                    this.meshes.push(thighMesh);
+
+                    // Hip joint
+                    const hipJoint = new CANNON.HingeConstraint(
+                        torsoBody,
+                        thighBody,
+                        {
+                            pivotA: new CANNON.Vec3(leg.x, -0.6, leg.z),
+                            pivotB: new CANNON.Vec3(0, 0.5, 0),
+                            axisA: new CANNON.Vec3(0, 0, 1),
+                            axisB: new CANNON.Vec3(0, 0, 1)
+                        }
+                    );
+                    this.world.addConstraint(hipJoint);
+                    this.joints.push({ constraint: hipJoint, motor: true });
+
+                    // Calf
+                    const calfShape = new CANNON.Box(new CANNON.Vec3(0.1, 0.5, 0.1));
+                    const calfBody = new CANNON.Body({ mass: 1 });
+                    calfBody.addShape(calfShape);
+                    calfBody.position.set(leg.x, 1.5, leg.z);
+                    this.world.addBody(calfBody);
+                    this.bodies.push(calfBody);
+
+                    const calfGeometry = new THREE.BoxGeometry(0.2, 1.0, 0.2);
+                    const calfMaterial = new THREE.MeshStandardMaterial({ color: 0xff9800 });
+                    const calfMesh = new THREE.Mesh(calfGeometry, calfMaterial);
+                    calfMesh.castShadow = true;
+                    this.scene.add(calfMesh);
+                    this.meshes.push(calfMesh);
+
+                    // Knee joint
+                    const kneeJoint = new CANNON.HingeConstraint(
+                        thighBody,
+                        calfBody,
+                        {
+                            pivotA: new CANNON.Vec3(0, -0.5, 0),
+                            pivotB: new CANNON.Vec3(0, 0.5, 0),
+                            axisA: new CANNON.Vec3(0, 0, 1),
+                            axisB: new CANNON.Vec3(0, 0, 1)
+                        }
+                    );
+                    this.world.addConstraint(kneeJoint);
+                    this.joints.push({ constraint: kneeJoint, motor: true });
+                });
+
+                // Add hands
+                const armPairs = [
+                    { x: -0.3, z: 0, side: -1 }, // Left arm
+                    { x: 0.3, z: 0, side: 1 }    // Right arm
+                ];
+
+                armPairs.forEach((arm, index) => {
+                    // Upper arm
+                    const upperArmShape = new CANNON.Box(new CANNON.Vec3(0.1, 0.4, 0.1));
+                    const upperArmBody = new CANNON.Body({ mass: 1 });
+                    upperArmBody.addShape(upperArmShape);
+                    upperArmBody.position.set(arm.x, 3.5, arm.z);
+                    this.world.addBody(upperArmBody);
+                    this.bodies.push(upperArmBody);
+
+                    const upperArmGeometry = new THREE.BoxGeometry(0.2, 0.8, 0.2);
+                    const upperArmMaterial = new THREE.MeshStandardMaterial({ color: 0x9c27b0 });
+                    const upperArmMesh = new THREE.Mesh(upperArmGeometry, upperArmMaterial);
+                    upperArmMesh.castShadow = true;
+                    this.scene.add(upperArmMesh);
+                    this.meshes.push(upperArmMesh);
+
+                    // Shoulder joint
+                    const shoulderJoint = new CANNON.HingeConstraint(
+                        torsoBody,
+                        upperArmBody,
+                        {
+                            pivotA: new CANNON.Vec3(arm.x, 0.6, arm.z),
+                            pivotB: new CANNON.Vec3(0, 0.4, 0),
+                            axisA: new CANNON.Vec3(0, 0, 1),
+                            axisB: new CANNON.Vec3(0, 0, 1)
+                        }
+                    );
+                    this.world.addConstraint(shoulderJoint);
+                    this.joints.push({ constraint: shoulderJoint, motor: true });
+
+                    // Forearm
+                    const forearmShape = new CANNON.Box(new CANNON.Vec3(0.08, 0.3, 0.08));
+                    const forearmBody = new CANNON.Body({ mass: 0.5 });
+                    forearmBody.addShape(forearmShape);
+                    forearmBody.position.set(arm.x, 2.7, arm.z);
+                    this.world.addBody(forearmBody);
+                    this.bodies.push(forearmBody);
+
+                    const forearmGeometry = new THREE.BoxGeometry(0.16, 0.6, 0.16);
+                    const forearmMaterial = new THREE.MeshStandardMaterial({ color: 0x673ab7 });
+                    const forearmMesh = new THREE.Mesh(forearmGeometry, forearmMaterial);
+                    forearmMesh.castShadow = true;
+                    this.scene.add(forearmMesh);
+                    this.meshes.push(forearmMesh);
+
+                    // Elbow joint
+                    const elbowJoint = new CANNON.HingeConstraint(
+                        upperArmBody,
+                        forearmBody,
+                        {
+                            pivotA: new CANNON.Vec3(0, -0.4, 0),
+                            pivotB: new CANNON.Vec3(0, 0.3, 0),
+                            axisA: new CANNON.Vec3(0, 0, 1),
+                            axisB: new CANNON.Vec3(0, 0, 1)
+                        }
+                    );
+                    this.world.addConstraint(elbowJoint);
+                    this.joints.push({ constraint: elbowJoint, motor: true });
+                });
+
+                // Set initial positions for motors
+                this.joints.forEach(joint => {
+                    if (joint.motor) {
+                        joint.constraint.enableMotor();
+                        joint.constraint.motorSpeed = 0;
+                        joint.constraint.motorMaxForce = 50;
+                    }
+                });
+            }
+
+            getState() {
+                const torso = this.bodies[0];
+                
+                // Basic state information
+                const state = [
+                    torso.position.y, // Height
+                    torso.velocity.x, // X velocity
+                    torso.velocity.y, // Y velocity
+                    torso.quaternion.toAxisAngle(new CANNON.Vec3())[1] // Upright angle
+                ];
+
+                // Add leg angles and angular velocities
+                for (let i = 1; i < this.bodies.length; i++) {
+                    const body = this.bodies[i];
+                    const angle = body.quaternion.toAxisAngle(new CANNON.Vec3())[1];
+                    const angularVel = body.angularVelocity.z;
+                    state.push(angle, angularVel);
+                }
+
+                return tf.tensor2d([state]);
+            }
+
+            act(state) {
+                return tf.tidy(() => {
+                    return this.brain.predict(state, { batchSize: 1 });
+                });
+            }
+
+            applyActions(actions) {
+                const actionsData = actions.dataSync();
+                
+                // Apply actions to joints
+                for (let i = 0; i < this.joints.length; i++) {
+                    if (this.joints[i].motor) {
+                        // Scale the action to a reasonable motor speed
+                        this.joints[i].constraint.motorSpeed = actionsData[i] * 3;
+                    }
+                }
+                
+                actions.dispose();
+            }
+
+            update() {
+                if (!this.alive) return;
+
+                this.timeAlive++;
+                
+                // Get state and decide action
+                const state = this.getState();
+                const action = this.act(state);
+                this.applyActions(action);
+                state.dispose();
+
+                // Calculate reward
+                const torso = this.bodies[0];
+                const distanceReward = torso.position.x - this.previousXPos;
+                this.previousXPos = torso.position.x;
+                
+                const uprightBonus = Math.cos(torso.quaternion.toAxisAngle(new CANNON.Vec3())[1]);
+                const aliveBonus = 0.1;
+                
+                // Small penalty for using motors (energy cost)
+                let energyCost = 0;
+                for (let i = 0; i < this.joints.length; i++) {
+                    if (this.joints[i].motor) {
+                        energyCost += Math.abs(this.joints[i].constraint.motorSpeed) * 0.01;
+                    }
+                }
+                
+                this.reward += distanceReward * 10 + uprightBonus * 0.1 + aliveBonus - energyCost;
+
+                // Check if fallen
+                if (torso.position.y < 1.0 || Math.abs(torso.quaternion.toAxisAngle(new CANNON.Vec3())[1]) > Math.PI/2) {
+                    this.alive = false;
+                    this.reward -= 5; // Penalty for falling
+                }
+            }
+
+            dispose() {
+                // Remove bodies from world
+                this.bodies.forEach(body => this.world.removeBody(body));
+                
+                // Remove meshes from scene
+                this.meshes.forEach(mesh => this.scene.remove(mesh));
+                
+                // Remove constraints
+                this.joints.forEach(joint => this.world.removeConstraint(joint.constraint));
+                
+                // Dispose brain if not best brain
+                if (this.brain !== bestBrain) {
+                    this.brain.dispose();
+                }
+            }
+        }
+
+        // Genetic algorithm functions
+        function evolvePopulation() {
+            // Calculate fitness for each walker
+            walkers.forEach(walker => {
+                walker.fitness = walker.reward;
+            });
+
+            // Sort by fitness
+            walkers.sort((a, b) => b.fitness - a.fitness);
+            
+            // Get best brain
+            bestBrain = tf.clone(walkers[0].brain);
+            
+            // Create new population
+            const newWalkers = [];
+            
+            // Elitism: keep the best performers
+            for (let i = 0; i < SIMULATION_PARAMS.eliteCount; i++) {
+                newWalkers.push(new BipedalWalker(world, scene, tf.clone(walkers[i].brain)));
+            }
+            
+            // Create children through crossover and mutation
+            while (newWalkers.length < SIMULATION_PARAMS.populationSize) {
+                // Select parents (tournament selection)
+                const parentA = selectParent();
+                const parentB = selectParent();
+                
+                // Crossover
+                const childBrain = crossover(parentA.brain, parentB.brain);
+                
+                // Mutation
+                mutate(childBrain, SIMULATION_PARAMS.mutationRate);
+                
+                newWalkers.push(new BipedalWalker(world, scene, childBrain));
+            }
+            
+            // Dispose old population
+            walkers.forEach(walker => walker.dispose());
+            
+            // Set new population
+            walkers = newWalkers;
+            
+            generation++;
+            generationElement.textContent = generation;
+            
+            // Update status message
+            statusMessage.textContent = "Evolved to generation " + generation;
+        }
+
+        function selectParent() {
+            // Tournament selection
+            const tournamentSize = 3;
+            let best = null;
+            
+            for (let i = 0; i < tournamentSize; i++) {
+                const candidate = walkers[Math.floor(Math.random() * walkers.length)];
+                if (!best || candidate.fitness > best.fitness) {
+                    best = candidate;
+                }
+            }
+            
+            return best;
+        }
+
+        function crossover(brainA, brainB) {
+            return tf.tidy(() => {
+                const newBrain = createBrain();
+                const weightsA = brainA.getWeights();
+                const weightsB = brainB.getWeights();
+                const newWeights = [];
+                
+                for (let i = 0; i < weightsA.length; i++) {
+                    const tensorA = weightsA[i];
+                    const tensorB = weightsB[i];
+                    const shape = tensorA.shape;
+                    const valuesA = tensorA.dataSync();
+                    const valuesB = tensorB.dataSync();
+                    const newValues = new Float32Array(valuesA.length);
+                    
+                    // Crossover: for each weight, randomly select from parent A or B
+                    for (let j = 0; j < valuesA.length; j++) {
+                        newValues[j] = Math.random() < 0.5 ? valuesA[j] : valuesB[j];
+                    }
+                    
+                    newWeights.push(tf.tensor(newValues, shape));
+                }
+                
+                newBrain.setWeights(newWeights);
+                return newBrain;
+            });
+        }
+
+        function mutate(brain, rate) {
+            tf.tidy(() => {
+                const weights = brain.getWeights();
+                const newWeights = [];
+                
+                for (let i = 0; i < weights.length; i++) {
+                    const tensor = weights[i];
+                    const shape = tensor.shape;
+                    const values = tensor.dataSync().slice();
+                    
+                    // Mutate: randomly change some weights
+                    for (let j = 0; j < values.length; j++) {
+                        if (Math.random() < rate) {
+                            values[j] += randomGaussian() * 0.2;
+                        }
+                    }
+                    
+                    newWeights.push(tf.tensor(values, shape));
+                }
+                
+                brain.setWeights(newWeights);
+            });
+        }
+
+        function randomGaussian() {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random();
+            while(v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        // Simulation functions
+        function updateSimulation() {
+            if (!isRunning) return;
+
+            let allDead = true;
+            let maxDistance = 0;
+            let maxReward = 0;
+            let maxSpeed = 0;
+
+            // Update each walker
+            walkers.forEach(walker => {
+                if (walker.alive) {
+                    allDead = false;
+                    walker.update();
+                    
+                    // Update stats
+                    const torso = walker.bodies[0];
+                    const distance = torso.position.x;
+                    if (distance > maxDistance) maxDistance = distance;
+                    if (walker.reward > maxReward) maxReward = walker.reward;
+                    
+                    const speed = torso.velocity.x;
+                    if (speed > maxSpeed) maxSpeed = speed;
+                }
+            });
+
+            // Update UI
+            distanceElement.textContent = maxDistance.toFixed(2) + 'm';
+            rewardElement.textContent = maxReward.toFixed(2);
+            speedElement.textContent = Math.abs(maxSpeed).toFixed(2);
+            
+            // Update progress bar
+            const progress = (walkers[0].timeAlive / SIMULATION_PARAMS.maxTimesteps) * 100;
+            progressBar.style.width = progress + '%';
+
+            // Update status message
+            if (allDead) {
+                statusMessage.textContent = "All robots fell. Evolving...";
+            } else {
+                statusMessage.textContent = "Learning in progress...";
+            }
+
+            // If all walkers are dead or max timesteps reached, evolve population
+            if (allDead || walkers[0].timeAlive >= SIMULATION_PARAMS.maxTimesteps) {
+                evolvePopulation();
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Update physics with simulation speed
+            const deltaTime = clock.getDelta();
+            for (let i = 0; i < simulationSpeed; i++) {
+                world.step(SIMULATION_PARAMS.timeStep);
+            }
+            
+            // Update simulation
+            updateSimulation();
+            
+            // Update Three.js meshes to match Cannon.js bodies
+            walkers.forEach(walker => {
+                for (let i = 0; i < walker.bodies.length; i++) {
+                    walker.meshes[i].position.copy(walker.bodies[i].position);
+                    walker.meshes[i].quaternion.copy(walker.bodies[i].quaternion);
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            startBtn.textContent = isRunning ? 'Pause Learning' : 'Start Learning';
+            startBtn.classList.toggle('paused', isRunning);
+            statusMessage.textContent = isRunning ? "Learning started..." : "Learning paused";
+        });
+
+        resetBtn.addEventListener('click', () => {
+            // Dispose all walkers
+            walkers.forEach(walker => walker.dispose());
+            
+            // Reset variables
+            generation = 0;
+            bestBrain = null;
+            isRunning = false;
+            
+            // Update UI
+            generationElement.textContent = '0';
+            distanceElement.textContent = '0.0m';
+            rewardElement.textContent = '0.0';
+            speedElement.textContent = '0.0';
+            progressBar.style.width = '0%';
+            startBtn.textContent = 'Start Learning';
+            startBtn.classList.remove('paused');
+            statusMessage.textContent = "Simulation reset";
+            
+            // Create new population
+            createPopulation();
+        });
+
+        uiToggle.addEventListener('click', () => {
+            document.getElementById('ui').classList.toggle('hidden');
+            uiToggle.textContent = document.getElementById('ui').classList.contains('hidden') ? '☰' : '✕';
+        });
+
+        speedSlider.addEventListener('input', () => {
+            simulationSpeed = parseFloat(speedSlider.value);
+            speedValue.textContent = simulationSpeed.toFixed(1) + 'x';
+        });
+
+        mutationSlider.addEventListener('input', () => {
+            SIMULATION_PARAMS.mutationRate = parseFloat(mutationSlider.value);
+            mutationValue.textContent = SIMULATION_PARAMS.mutationRate.toFixed(2);
+        });
+
+        // Camera control buttons
+        cameraFront.addEventListener('click', () => {
+            cameraTheta = 0;
+            cameraPhi = Math.PI / 2;
+            updateCameraPosition();
+        });
+
+        cameraBack.addEventListener('click', () => {
+            cameraTheta = Math.PI;
+            cameraPhi = Math.PI / 2;
+            updateCameraPosition();
+        });
+
+        cameraLeft.addEventListener('click', () => {
+            cameraTheta = -Math.PI / 2;
+            cameraPhi = Math.PI / 2;
+            updateCameraPosition();
+        });
+
+        cameraRight.addEventListener('click', () => {
+            cameraTheta = Math.PI / 2;
+            cameraPhi = Math.PI / 2;
+            updateCameraPosition();
+        });
+
+        cameraTop.addEventListener('click', () => {
+            cameraTheta = 0;
+            cameraPhi = 0.1;
+            updateCameraPosition();
+        });
+
+        cameraReset.addEventListener('click', () => {
+            cameraDistance = 10;
+            cameraTheta = 0;
+            cameraPhi = Math.PI / 4;
+            updateCameraPosition();
+        });
+
+        // Initialize the simulation
+        init();
+    </script>
+</body>
+</html>
