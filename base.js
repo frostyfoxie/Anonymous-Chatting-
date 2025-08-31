@@ -24,7 +24,7 @@ const db = firebase.database();
 // Function to delete messages older than 1 minute
 function deleteOldMessages() {
   const now = Date.now();
-  const oneMinuteAgo = now - 60000; // 60 seconds * 1000 ms
+  const oneMinuteAgo = now - 10000; // 60 seconds * 1000 ms
   
   // Process groups
   db.ref('groups').once('value').then((groupsSnapshot) => {
